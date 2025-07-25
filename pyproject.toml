@@ -1,0 +1,28 @@
+[project]
+name = "aqc4all"
+version = "0.1.0"
+description = "Aruba QuickConnect for All"
+authors = [{ name = "Walter Plinge", email = "walter@plinge.hair" }]
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+    "selenium",
+    "requests",
+    "bs4",
+    "pyasn1",
+    "cryptography",
+    "pyotp",
+    "pyopenssl",
+    "configparser",
+]
+
+[project.scripts]
+aqc4all = "aqc4all.main:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
