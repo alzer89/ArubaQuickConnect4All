@@ -102,7 +102,7 @@ def generate_apple_mobileconfig(created_configs, extracted_data, cert_path="/tmp
       <key>PayloadType</key>
       <string>com.apple.wifi.managed</string>
       <key>PayloadIdentifier</key>
-      <string>edu.unsw.wifi.eduroam</string>
+      <string>quickconnect.aruba.wifi.{ssid}</string>
       <key>SSID_STR</key>
       <string>{extracted_data['ssid']}</string>
       <key>EncryptionType</key>
