@@ -202,17 +202,19 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
                 subprocess.run([ sdbinary, 'mkdir', '-p', newcert_path, newkey_path, directory ], check=True)
 
         for v in old_certs:
+            oldoldpath = f'{old_path}/{v}'
             oldpath = f'{config_path}/{v}'
             newpath =  f'{newcert_path}/{ssid}_{v}'
-            replace_string(f'{config_path}/{config_file}', oldpath, newpath)
+            replace_string(f'{config_path}/{config_file}', oldoldpath, newpath)
             subprocess.run([ sdbinary, 'cp', oldpath, newpath ])
             subprocess.run([ sdbinary, 'chown', 'root:root', newpath ])
             subprocess.run([ sdbinary, 'chmod', '600', newpath ])
 
         for v in old_keys:
+            oldoldpath = f'{old_path}/{v}'
             oldpath = f'{config_path}/{v}'
             newpath =  f'{newkey_path}/{ssid}_{v}'
-            replace_string(f'{config_path}/{config_file}', oldpath, newpath)
+            replace_string(f'{config_path}/{config_file}', oldoldpath, newpath)
             subprocess.run([ sdbinary, 'cp', oldpath, newpath ], check=True)
             subprocess.run([ sdbinary, 'chown', 'root:root', newpath ], check=True)
             subprocess.run([ sdbinary, 'chmod', '600', newpath ], check=True)
