@@ -115,9 +115,9 @@ def detect_sudo_or_doas():
                                 stderr=subprocess.PIPE,
                                 check=False)
         if result.returncode == 0:
-            return passwordless_sudo
+            return 'passwordless_sudo'
         else:
-            return sudo
+            return 'sudo'
     except FileNotFoundError:
         try:
             result = subprocess.run(['doas', '-C', '/etc/doas.conf', 'true'],
@@ -125,9 +125,9 @@ def detect_sudo_or_doas():
                                     stderr=subprocess.PIPE,
                                     check=False)
             if result.returncode == 0:
-                return passwordless_doas
+                return 'passwordless_doas'
             else:
-                return doas
+                return 'doas'
         except FileNotFoundError:
             return False
     except Exception as e:
@@ -144,19 +144,24 @@ def prompt_to_install(args, extracted_data):
                 print(f" - {k}")
         print()
         print("This next part requires ROOT (sudo/doas) privileges")
-        print("If you do not have this, you will not be able to install these configs")
+        if 'passwordless' in command:
+            print("IMPORTANT: You can already execute passwordless root commands.  Think carefully!")
+        else:
+            print("If you do not have this, you will not be able to install these configs")
         print("You can always, install these files manually, should you wish.")
         proceed = input("Continue? [y/N]: ").strip().lower()
         if proceed in ['y', 'Y', 'Yes', 'yEs', 'yeS', 'YES', 'yes', 'Yeah, why not...']:
-            try:
-                sdbinary = detect_sudo_or_doas()
-                if sdbinary == 'sudo' or sdbinary == 'doas':
-                    if os.geteuid() != 0:
-                        subprocess.check_call([sdbinary, sys.executable] + '--install-only')
-            except:
-                print("Authentication unsuccessful.")
-                print(f"Configs and keys have been saved at ~/{extracted_data['ssid']}-files")
-                print("You can choose to manually install them at a later time if you wish.")
+            if os.geteuid() != 0:
+                try:
+                    sdbinary = detect_sudo_or_doas()
+                    subprocess.check_call([sdbinary, sys.executable] + '--install-only')
+                    if sdbinary == 'sudo' or sdbinary == 'doas':
+                        if os.geteuid() != 0:
+                            subprocess.check_call([sdbinary, sys.executable] + '--install-only')
+                except:
+                    print("Authentication unsuccessful.")
+                    print(f"Configs and keys have been saved at ~/{extracted_data['ssid']}-files")
+                    print("You can choose to manually install them at a later time if you wish.")
             for k, v in detected.items():
                 if v:
                     proceed = input(f"Install config for {k}? [y/n]: ").strip().lower()
@@ -230,7 +235,7 @@ def install_networkmanager_config(extracted_data):
     config_file = f"{config_path}/{ssid}.nmconnection"
     install_path = "/etc/NetworkManager/system-connections"
     extra_dirs = os.path.expanduser(f"~/.config/NetworkManager")
-    reload_command = "sudo nmcli connection reload"
+    reload_command = "nmcli connection reload"
 
     try:
         install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, False)
@@ -243,7 +248,7 @@ def install_wpa_supplicant_config():
     install_path = "/etc/wpa_supplicant/wpa_supplicant.conf"
     config_path = os.path.expanduser(f"~/{ssid}-files")
     config_file = f"{config_path}/wpa_supplicant_{ssid}.conf"
-    reload_command = "sudo systemctl restart wpa_supplicant"
+    reload_command = "systemctl restart wpa_supplicant"
 
     try:
         install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, True)
@@ -256,7 +261,7 @@ def install_netctl_config():
     config_install_path = "/etc/netctl/{ssid}"
     config_path = os.path.expanduser(f"~/{ssid}-files")
     config_file = f"{config_path}/netctl_{ssid}"
-    reload_command = f"sudo netctl start {ssid}"
+    reload_command = f"netctl start {ssid}"
 
     try:
         install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, False)
@@ -268,7 +273,7 @@ def install_connman_config():
     ssid =  extracted_data['ssid']
     config_path = os.path.expanduser(f"~/{ssid}-files")
     config_file = f"{config_path}/{ssid}.config"
-    reload_command = "sudo systemctl restart connman"
+    reload_command = "systemctl restart connman"
     install_path = f"/var/lib/connman/{ssid}.config"
     try:
         install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, False)
@@ -280,7 +285,7 @@ def install_wicked_config():
     ssid =  extracted_data['ssid']
     config_path = os.path.expanduser(f"~/{ssid}-files")
     config_file = f"{config_path}/wicked_{ssid}.xml"
-    reload_command = "sudo systemctl restart wicked"
+    reload_command = "systemctl restart wicked"
     install_path = f"/etc/wicked/ifcfg-{ssid}"
 
     try:
