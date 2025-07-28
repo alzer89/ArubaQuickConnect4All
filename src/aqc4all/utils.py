@@ -145,17 +145,14 @@ def prompt_to_install(args, extracted_data):
         print()
         print("This next part requires ROOT (sudo/doas) privileges")
         print("If you do not have this, you will not be able to install these configs")
+        print("You can always, install these files manually, should you wish.")
         proceed = input("Continue? [y/N]: ").strip().lower()
         if proceed in ['y', 'Y', 'Yes', 'yEs', 'yeS', 'YES', 'yes', 'Yeah, why not...']:
             try:
                 sdbinary = detect_sudo_or_doas()
                 if sdbinary == 'sudo' or sdbinary == 'doas':
-                    sdpassword = getpass.getpass(prompt=f'{sdbinary} password: ')
-                    p = subprocess.Popen([sdbinary, '-S', 'ls'], stderr=subprocess.PIPE, stdout=subprocess.PIPE,  stdin=subprocess.PIPE)
-                    try:
-                        out, err = p.communicate(input=(sdpassword+'\n').encode(),timeout=30)
-                    except subprocess.TimeoutExpired:
-                        p.kill()
+                    if os.geteuid() != 0:
+                        subprocess.check_call([sdbinary, sys.executable] + '--install-only'])
             except:
                 print("Authentication unsuccessful.")
                 print(f"Configs and keys have been saved at ~/{extracted_data['ssid']}-files")
@@ -167,6 +164,7 @@ def prompt_to_install(args, extracted_data):
                         do_install(k, extracted_data)
 
 def do_install(k, extracted_data):
+    sudo_or_doas = detect_sudo_or_doas
     if k == "NetworkManager":
         install_networkmanager_config(extracted_data)
     elif k == "wpa_supplicant":
@@ -181,41 +179,49 @@ def do_install(k, extracted_data):
         print("[!] No supported network stack detected. You must be a hardcore Linux chad who runs LFS.  Mad respect...")
 
 def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, append=False):
-    ssid =  extracted_data['ssid']
-    config_path = os.path.expanduser(f"~/{ssid}-files")
-    newcert_path = "/etc/ssl/certs"
-    newkey_path = "/etc/ssl/private"
-    old_certs = ['ca_root.pem', 'client.pem']
-    old_keys = [ 'private_key.pem']
+    try:
+        ssid =  extracted_data['ssid']
+        config_path = os.path.expanduser(f"~/{ssid}-files")
+        newcert_path = "/etc/ssl/certs"
+        newkey_path = "/etc/ssl/private"
+        old_certs = ['ca_root.pem', 'client.pem']
+        old_keys = [ 'private_key.pem']
 
-    if extra_dirs:
-        os.makedirs(extra_dirs, exist_ok=True)
+        if extra_dirs:
+            os.makedirs(extra_dirs, exist_ok=True)
 
-    for v in old_certs:
-        oldpath = f'{config_path}/{v}'
-        newpath =  f'{newcert_path}/{ssid}_{v}'
-        replace_string(config_file, oldpath, newpath)
-        shutil.copy2(oldpath, newpath)
-        os.chmod(newpath, 0o600)
+        for v in old_certs:
+            oldpath = f'{config_path}/{v}'
+            newpath =  f'{newcert_path}/{ssid}_{v}'
+            replace_string(config_file, oldpath, newpath)
+            shutil.copy2(oldpath, newpath)
+            os.chmod(newpath, 0o600)
 
-    for v in old_keys:
-        oldpath = f'{old_path}/{v}'
-        newpath =  f'{newkey_path}/{ssid}_{v}'
-        replace_string(config_file, f'{old_path}/{old_file}', f'{newkey_path}/{ssid}_{v}')
-        replace_string(config_file, oldpath, newpath)
-        shutil.copy2(oldpath, newpath)
-        os.chmod(newpath, 0o600)
-    if apppend:
-        f1 = open(install_path, 'a+')
-        f2 = open(config_file, 'r')
-        f1.write(f2.read())
-        f1.close()
-        f2.close()
-    else:
-        shutil.copy2(config_file, install_path)
-        os.chmod(install_path, 0o600)
+        for v in old_keys:
+            oldpath = f'{old_path}/{v}'
+            newpath =  f'{newkey_path}/{ssid}_{v}'
+            replace_string(config_file, f'{old_path}/{old_file}', f'{newkey_path}/{ssid}_{v}')
+            replace_string(config_file, oldpath, newpath)
+            shutil.copy2(oldpath, newpath)
+            os.chmod(newpath, 0o600)
+        if apppend:
+            f1 = open(install_path, 'a+')
+            f2 = open(config_file, 'r')
+            f1.write(f2.read())
+            f1.close()
+            f2.close()
+        else:
+            shutil.copy2(config_file, install_path)
+            os.chmod(install_path, 0o600)
  
-    subprocess.run(reload_command.split(), check=True)
+        subprocess.run(reload_command.split(), check=True)
+
+    except PermissionError:
+        print(f"Permission denied. Root privileges required.")
+    except FileNotFoundError:
+        print(f"Source file or destination directory not found.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 
 def install_networkmanager_config(extracted_data):
