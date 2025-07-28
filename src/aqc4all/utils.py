@@ -254,7 +254,7 @@ def install_networkmanager_config(extracted_data, sdbinary):
     except Exception as e:
         print(f"[!] Failed to install NetworkManager config: {e}")
 
-def install_wpa_supplicant_config(extracted_data):
+def install_wpa_supplicant_config(extracted_data, sdbinary):
     ssid =  extracted_data['ssid']
     install_path = "/etc/wpa_supplicant/wpa_supplicant.conf"
     config_path = os.path.expanduser(f"~/{ssid}-files")
