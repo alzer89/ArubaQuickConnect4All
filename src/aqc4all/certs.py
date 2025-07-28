@@ -9,7 +9,8 @@ import requests
 import sys
 from OpenSSL import crypto
 import textwrap
-from pyasn1.codec.der.decoder import decode as decoder
+#from pyasn1.codec.der.decoder import decode as decoder
+from pyasn1.codec.der.decoder import decode as asn1_decode
 
 def post_device_metadata(config_values, BASE_URL, USER_AGENT, mac_wifi, mac_eth="CA:FE:CO:FF:EE:99"):
     print("[*] Creating and posting device metadata payload...")
@@ -198,7 +199,8 @@ def parse_csrattrs_der(extracted_data, bin_path="/tmp/aqc/ca_csrattr.bin", txt_p
         with open(bin_path, "rb") as f:
             data = f.read()
 
-        decoded, _ = decoder.decode(data)
+        #decoded, _ = decoder.decode(data)
+        decoded, _ = asn1_decode(data)
         
         def walk(asn1_obj, indent=0):
             lines = []
