@@ -169,6 +169,10 @@ def prompt_to_install(args, extracted_data):
 
 def do_install(k, extracted_data, sdbinary):
     sudo_or_doas = detect_sudo_or_doas
+    try:
+        sudo_or_doas.replace("passwordless_", "")
+    except:
+        pass
     if k == "NetworkManager":
         install_networkmanager_config(extracted_data, sdbinary)
     elif k == "wpa_supplicant":
