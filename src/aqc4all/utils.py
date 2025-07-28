@@ -152,7 +152,7 @@ def prompt_to_install(args, extracted_data):
                 sdbinary = detect_sudo_or_doas()
                 if sdbinary == 'sudo' or sdbinary == 'doas':
                     if os.geteuid() != 0:
-                        subprocess.check_call([sdbinary, sys.executable] + '--install-only'])
+                        subprocess.check_call([sdbinary, sys.executable] + '--install-only')
             except:
                 print("Authentication unsuccessful.")
                 print(f"Configs and keys have been saved at ~/{extracted_data['ssid']}-files")
