@@ -8,6 +8,8 @@ import json
 import requests
 import sys
 from OpenSSL import crypto
+import textwrap
+from pyasn1.codec.der.decoder import decode as decoder
 
 def post_device_metadata(config_values, BASE_URL, USER_AGENT, mac_wifi, mac_eth="CA:FE:CO:FF:EE:99"):
     print("[*] Creating and posting device metadata payload...")
@@ -329,7 +331,7 @@ CN = Request Linux Certificate
     try:
         subprocess.run([
             "openssl", "req",
-            "-sha1",
+            "-sha256",
             "-new", "-key", key_path,
             "-out", csr_path,
             "-config", csr_config_path

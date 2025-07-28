@@ -4,6 +4,7 @@ import tempfile
 import uuid
 import getpass
 import subprocess
+import re
 
 def replace_string(filename, old_string, new_string):
     try:
