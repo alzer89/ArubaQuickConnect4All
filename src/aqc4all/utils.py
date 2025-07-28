@@ -162,7 +162,6 @@ def prompt_to_install(args, extracted_data):
                     print("Authentication unsuccessful.")
                     print(f"Configs and keys have been saved at ~/{extracted_data['ssid']}-files")
                     print("You can choose to manually install them at a later time if you wish.")
-            print('Running as UID %d:' % os.geteuid())
             for k, v in detected.items():
                 if v:
                     proceed = input(f"Install config for {k}? [y/n]: ").strip().lower()
@@ -184,7 +183,7 @@ def do_install(k, extracted_data):
     else:
         print("[!] No supported network stack detected. You must be a hardcore Linux chad who runs LFS.  Mad respect...")
 
-def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, append=False):
+def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, sudo_or_doas, append=False):
     try:
         ssid =  extracted_data['ssid']
         config_path = os.path.expanduser(f"~/{ssid}-files")
@@ -195,33 +194,44 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
         old_path = '/tmp/aqc'
 
         if extra_dirs:
-            os.makedirs(extra_dirs, exist_ok=True)
+            for dir in extra_dirs:
+                subcommand.run([ sudo_or_doas, 'mkdir', '-p', newcert_path, newkey_path ], check=True)
+            #os.makedirs(extra_dirs, exist_ok=True)
 
         for v in old_certs:
             oldpath = f'{old_path}/{v}'
             newpath =  f'{newcert_path}/{ssid}_{v}'
             replace_string(config_file, oldpath, newpath)
-            shutil.copy2(oldpath, newpath)
-            os.chmod(newpath, 0o600)
+            subcommand.run([ sudo_or_doas, 'cp', oldpath, newpath ])
+            subcommand.run([ sudo_or_doas, 'chown', 'root:root', newpath ])
+            subcommand.run([ sudo_or_doas, 'chmod', '600', newpath ])
+            #shutil.copy2(oldpath, newpath)
+            #os.chmod(newpath, 0o600)
 
         for v in old_keys:
             oldpath = f'{old_path}/{v}'
             newpath =  f'{newkey_path}/{ssid}_{v}'
             replace_string(config_file, f'{old_path}/{old_file}', f'{newkey_path}/{ssid}_{v}')
             replace_string(config_file, oldpath, newpath)
-            shutil.copy2(oldpath, newpath)
-            os.chmod(newpath, 0o600)
+            subcommand.run([ sudo_or_doas, 'cp', oldpath, newpath ], check=True)
+            subcommand.run([ sudo_or_doas, 'chown', 'root:root', newpath ], check=True)
+            subcommand.run([ sudo_or_doas, 'chmod', '600', newpath ], check=True)
+            #shutil.copy2(oldpath, newpath)
+            #os.chmod(newpath, 0o600)
         if apppend:
-            f1 = open(install_path, 'a+')
-            f2 = open(config_file, 'r')
-            f1.write(f2.read())
-            f1.close()
-            f2.close()
+            subcommand.run([ sudo_or_doas, 'cat', config_file, '>>', install_path ], check=True)
+            #f1 = open(install_path, 'a+')
+            #f2 = open(config_file, 'r')
+            #f1.write(f2.read())
+            #f1.close()
+            #f2.close()
         else:
-            shutil.copy2(config_file, install_path)
-            os.chmod(install_path, 0o600)
+            subcommand.run([ sudo_or_doas, 'cp', config_file, install_path ], check=True)
+            subcommand.run([ sudo_or_doas, 'chmod', '600', install_path ], check=True)
+            #shutil.copy2(config_file, install_path)
+            #os.chmod(install_path, 0o600)
  
-        subprocess.run(reload_command.split(), check=True)
+        subprocess.run(sudo_or_doas + reload_command.split(), check=True)
 
     except PermissionError:
         print(f"Permission denied. Root privileges required.")
