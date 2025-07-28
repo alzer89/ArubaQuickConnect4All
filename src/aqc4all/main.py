@@ -95,7 +95,7 @@ def special_surprise(args):
         print("\033[95mWelcome to the secret BEANS mode!\033[0m")
         exit(0)
 
-def install_only(args):
+def install_only(args, extracted_data):
     if args.install_only:
         utils.prompt_to_install(args, extracted_data)
         exit(0)
