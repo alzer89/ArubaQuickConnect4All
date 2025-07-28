@@ -154,14 +154,15 @@ def prompt_to_install(args, extracted_data):
             if os.geteuid() != 0:
                 try:
                     sdbinary = detect_sudo_or_doas()
-                    subprocess.check_call([sdbinary, sys.executable] + '--install-only')
+                    subprocess.check_call([sdbinary, sys.executable, '--install-only'])
                     if sdbinary == 'sudo' or sdbinary == 'doas':
                         if os.geteuid() != 0:
-                            subprocess.check_call([sdbinary, sys.executable] + '--install-only')
+                            subprocess.check_call([sdbinary, sys.executable, '--install-only'])
                 except:
                     print("Authentication unsuccessful.")
                     print(f"Configs and keys have been saved at ~/{extracted_data['ssid']}-files")
                     print("You can choose to manually install them at a later time if you wish.")
+            print('Running as UID %d:' % os.geteuid())
             for k, v in detected.items():
                 if v:
                     proceed = input(f"Install config for {k}? [y/n]: ").strip().lower()
@@ -191,12 +192,13 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
         newkey_path = "/etc/ssl/private"
         old_certs = ['ca_root.pem', 'client.pem']
         old_keys = [ 'private_key.pem']
+        old_path = '/tmp/aqc'
 
         if extra_dirs:
             os.makedirs(extra_dirs, exist_ok=True)
 
         for v in old_certs:
-            oldpath = f'{config_path}/{v}'
+            oldpath = f'{old_path}{v}'
             newpath =  f'{newcert_path}/{ssid}_{v}'
             replace_string(config_file, oldpath, newpath)
             shutil.copy2(oldpath, newpath)
@@ -243,7 +245,7 @@ def install_networkmanager_config(extracted_data):
     except Exception as e:
         print(f"[!] Failed to install NetworkManager config: {e}")
 
-def install_wpa_supplicant_config():
+def install_wpa_supplicant_config(extracted_data):
     ssid =  extracted_data['ssid']
     install_path = "/etc/wpa_supplicant/wpa_supplicant.conf"
     config_path = os.path.expanduser(f"~/{ssid}-files")
@@ -256,7 +258,7 @@ def install_wpa_supplicant_config():
     except Exception as e:
         print(f"[!] Failed to install wpa_supplicant config: {e}")
 
-def install_netctl_config():
+def install_netctl_config(extracted_data):
     ssid =  extracted_data['ssid']
     config_install_path = "/etc/netctl/{ssid}"
     config_path = os.path.expanduser(f"~/{ssid}-files")
@@ -269,7 +271,7 @@ def install_netctl_config():
     except Exception as e:
         print(f"[!] Failed to install netctl config: {e}")
 
-def install_connman_config():
+def install_connman_config(extracted_data):
     ssid =  extracted_data['ssid']
     config_path = os.path.expanduser(f"~/{ssid}-files")
     config_file = f"{config_path}/{ssid}.config"
@@ -281,7 +283,7 @@ def install_connman_config():
     except Exception as e:
         print(f"[!] Failed to install ConnMan config: {e}")
 
-def install_wicked_config():
+def install_wicked_config(extracted_data):
     ssid =  extracted_data['ssid']
     config_path = os.path.expanduser(f"~/{ssid}-files")
     config_file = f"{config_path}/wicked_{ssid}.xml"
