@@ -36,6 +36,7 @@ def parse_args():
     parser.add_argument("--noinstall", action="store_true", help="Don't install generated config & certificates to your system")
     parser.add_argument("--browser", choices=["chromium", "firefox"], help="Supported browsers: Chromium, Firefox")
     parser.add_argument("--noclean", action="store_true", help="Do not clean /tmp/aqc after completion")
+    parser.add_argument("--install-only", action="store_true", help="Install previously generated configs and certificates")
     parser.add_argument('--i-work-in-it', action="store_true", help="Special surprise for arrogant IT workers")
     return parser.parse_args()
 
@@ -77,6 +78,10 @@ def special_surprise(args):
         print("\033[95mWelcome to the secret BEANS mode!\033[0m")
         exit(0)
 
+def install_only(args):
+    if args.install_only:
+        utils.prompt_to_install(args, extracted_data)
+        exit(0)
 
 def main():
     USER_AGENT = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"
@@ -91,6 +96,7 @@ def main():
             }
     args = parse_args()
     special_surprise(args)
+    install_only(args)
     check_for_required_fields(args)
     login.launch_browser(args, BROWSER)
     url, cookies = login.perform_login_and_extract_gsid(args, USER_AGENT, BASE_URL, USERNAME, PASSWORD, TOTP_SECRET)

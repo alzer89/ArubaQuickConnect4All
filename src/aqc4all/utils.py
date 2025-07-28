@@ -61,10 +61,11 @@ def build_est_payload(mac, otp):
     return payload
 
 def display_wifi_client_info(extracted_data):
+    ssid = extracted_data['ssid']
     print("==========================")
     print("..:: wifi client info ::..")
     print("==========================")
-    print(f"SSID: {extracted_data['ssid']}")
+    print(f"SSID: {ssid}")
     print("security: WPA / WPA2 Enterprise")
     print("key-mgmt: wpa-eap")
     print("eap: tls")
@@ -106,25 +107,55 @@ def persist_files(created_configs, extracted_data, target_dir=os.path.expanduser
         except Exception as e:
             print(f"[!] Failed to copy config {file}: {e}")
 
+def detect_sudo_or_doas():
+    # This prefers sudo over doas...for now...
+    try:
+        result = subprocess.run(['sudo', '-n', 'true'],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                check=False)
+        if result.returncode == 0:
+            return passwordless_sudo
+        else:
+            return sudo
+    except FileNotFoundError:
+        try:
+            result = subprocess.run(['doas', '-C', '/etc/doas.conf', 'true'],
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE,
+                                    check=False)
+            if result.returncode == 0:
+                return passwordless_doas
+            else:
+                return doas
+        except FileNotFoundError:
+            return False
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return False
+
 def prompt_to_install(args, extracted_data):
     if not args.noinstall:
         detected = detect_network_stack()
+        command = passwordless_sudo_or_doas()
         print("[*] Detected the following network stack:")
         for k, v in detected.items():
             if v:
                 print(f" - {k}")
         print()
-        print("This next part requires ROOT (sudo) privileges")
+        print("This next part requires ROOT (sudo/doas) privileges")
         print("If you do not have this, you will not be able to install these configs")
         proceed = input("Continue? [y/N]: ").strip().lower()
         if proceed in ['y', 'Y', 'Yes', 'yEs', 'yeS', 'YES', 'yes', 'Yeah, why not...']:
             try:
-                sudo_password = getpass.getpass(prompt='sudo password: ')
-                p = subprocess.Popen(['sudo', '-S', 'ls'], stderr=subprocess.PIPE, stdout=subprocess.PIPE,  stdin=subprocess.PIPE)
-                try:
-                    out, err = p.communicate(input=(sudo_password+'\n').encode(),timeout=5)
-                except subprocess.TimeoutExpired:
-                    p.kill()
+                sdbinary = detect_sudo_or_doas()
+                if sdbinary == 'sudo' or sdbinary == 'doas':
+                    sdpassword = getpass.getpass(prompt=f'{sdbinary} password: ')
+                    p = subprocess.Popen([sdbinary, '-S', 'ls'], stderr=subprocess.PIPE, stdout=subprocess.PIPE,  stdin=subprocess.PIPE)
+                    try:
+                        out, err = p.communicate(input=(sdpassword+'\n').encode(),timeout=30)
+                    except subprocess.TimeoutExpired:
+                        p.kill()
             except:
                 print("Authentication unsuccessful.")
                 print(f"Configs and keys have been saved at ~/{extracted_data['ssid']}-files")
