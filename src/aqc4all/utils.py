@@ -219,7 +219,7 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
             subprocess.run([ sdbinary, 'chmod', '600', newpath ], check=True)
             #shutil.copy2(oldpath, newpath)
             #os.chmod(newpath, 0o600)
-        if apppend:
+        if append:
             subprocess.run([ sdbinary, 'cat', f'{config_path}/{config_file}', '>>', f'{install_path}/{config_file}' ], check=True)
             #f1 = open(install_path, 'a+')
             #f2 = open(config_file, 'r')
