@@ -154,10 +154,9 @@ def prompt_to_install(args, extracted_data):
             if os.geteuid() != 0:
                 try:
                     sdbinary = detect_sudo_or_doas()
-                    subprocess.check_call([sdbinary, sys.executable, '--install-only'])
                     if sdbinary == 'sudo' or sdbinary == 'doas':
                         if os.geteuid() != 0:
-                            subprocess.check_call([sdbinary, sys.executable, '--install-only'])
+                            subcommand.run([ sdbinary, 'true' ])
                 except:
                     print("Authentication unsuccessful.")
                     print(f"Configs and keys have been saved at ~/{extracted_data['ssid']}-files")
@@ -166,24 +165,24 @@ def prompt_to_install(args, extracted_data):
                 if v:
                     proceed = input(f"Install config for {k}? [y/n]: ").strip().lower()
                     if proceed in ['y', 'Y', 'Yes', 'yEs', 'yeS', 'YES', 'yes']:
-                        do_install(k, extracted_data)
+                        do_install(k, extracted_data, sdbinary)
 
-def do_install(k, extracted_data):
+def do_install(k, extracted_data, sdbinary):
     sudo_or_doas = detect_sudo_or_doas
     if k == "NetworkManager":
-        install_networkmanager_config(extracted_data)
+        install_networkmanager_config(extracted_data, sdbinary)
     elif k == "wpa_supplicant":
-        install_wpa_supplicant_config(extracted_data)
+        install_wpa_supplicant_config(extracted_data, sdbinary)
     elif k == "netctl":
-        install_netctl_config(extracted_data)
+        install_netctl_config(extracted_data, sdbinary)
     elif k == "connman":
-        install_connman_config(extracted_data)
+        install_connman_config(extracted_data, sdbinary)
     elif k == "wicked":
-        install_wicked_config(extracted_data)
+        install_wicked_config(extracted_data, sdbinary)
     else:
         print("[!] No supported network stack detected. You must be a hardcore Linux chad who runs LFS.  Mad respect...")
 
-def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, sudo_or_doas, append=False):
+def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, append=False):
     try:
         ssid =  extracted_data['ssid']
         config_path = os.path.expanduser(f"~/{ssid}-files")
@@ -195,16 +194,16 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
 
         if extra_dirs:
             for dir in extra_dirs:
-                subcommand.run([ sudo_or_doas, 'mkdir', '-p', newcert_path, newkey_path ], check=True)
+                subcommand.run([ sdbinary, 'mkdir', '-p', newcert_path, newkey_path ], check=True)
             #os.makedirs(extra_dirs, exist_ok=True)
 
         for v in old_certs:
             oldpath = f'{old_path}/{v}'
             newpath =  f'{newcert_path}/{ssid}_{v}'
             replace_string(config_file, oldpath, newpath)
-            subcommand.run([ sudo_or_doas, 'cp', oldpath, newpath ])
-            subcommand.run([ sudo_or_doas, 'chown', 'root:root', newpath ])
-            subcommand.run([ sudo_or_doas, 'chmod', '600', newpath ])
+            subcommand.run([ sdbinary, 'cp', oldpath, newpath ])
+            subcommand.run([ sdbinary, 'chown', 'root:root', newpath ])
+            subcommand.run([ sdbinary, 'chmod', '600', newpath ])
             #shutil.copy2(oldpath, newpath)
             #os.chmod(newpath, 0o600)
 
@@ -213,25 +212,25 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
             newpath =  f'{newkey_path}/{ssid}_{v}'
             replace_string(config_file, f'{old_path}/{old_file}', f'{newkey_path}/{ssid}_{v}')
             replace_string(config_file, oldpath, newpath)
-            subcommand.run([ sudo_or_doas, 'cp', oldpath, newpath ], check=True)
-            subcommand.run([ sudo_or_doas, 'chown', 'root:root', newpath ], check=True)
-            subcommand.run([ sudo_or_doas, 'chmod', '600', newpath ], check=True)
+            subcommand.run([ sdbinary, 'cp', oldpath, newpath ], check=True)
+            subcommand.run([ sdbinary, 'chown', 'root:root', newpath ], check=True)
+            subcommand.run([ sdbinary, 'chmod', '600', newpath ], check=True)
             #shutil.copy2(oldpath, newpath)
             #os.chmod(newpath, 0o600)
         if apppend:
-            subcommand.run([ sudo_or_doas, 'cat', config_file, '>>', install_path ], check=True)
+            subcommand.run([ sdbinary, 'cat', config_file, '>>', install_path ], check=True)
             #f1 = open(install_path, 'a+')
             #f2 = open(config_file, 'r')
             #f1.write(f2.read())
             #f1.close()
             #f2.close()
         else:
-            subcommand.run([ sudo_or_doas, 'cp', config_file, install_path ], check=True)
-            subcommand.run([ sudo_or_doas, 'chmod', '600', install_path ], check=True)
+            subcommand.run([ sdbinary, 'cp', config_file, install_path ], check=True)
+            subcommand.run([ sdbinary, 'chmod', '600', install_path ], check=True)
             #shutil.copy2(config_file, install_path)
             #os.chmod(install_path, 0o600)
  
-        subprocess.run(sudo_or_doas + reload_command.split(), check=True)
+        subprocess.run(sdbinary + reload_command.split(), check=True)
 
     except PermissionError:
         print(f"Permission denied. Root privileges required.")
@@ -241,7 +240,7 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
         print(f"An error occurred: {e}")
 
 
-def install_networkmanager_config(extracted_data):
+def install_networkmanager_config(extracted_data, sdbinary):
     ssid =  extracted_data['ssid']
     config_path = os.path.expanduser(f"~/{ssid}-files")
     config_file = f"{config_path}/{ssid}.nmconnection"
@@ -250,7 +249,7 @@ def install_networkmanager_config(extracted_data):
     reload_command = "nmcli connection reload"
 
     try:
-        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, False)
+        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, sdbinary, False)
         print(f"[✓] NetworkManager config installed to {config_path}")
     except Exception as e:
         print(f"[!] Failed to install NetworkManager config: {e}")
@@ -263,12 +262,12 @@ def install_wpa_supplicant_config(extracted_data):
     reload_command = "systemctl restart wpa_supplicant"
 
     try:
-        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, True)
+        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, sdbinary, True)
         print(f"[✓] wpa_supplicant config appended to {config_path}")
     except Exception as e:
         print(f"[!] Failed to install wpa_supplicant config: {e}")
 
-def install_netctl_config(extracted_data):
+def install_netctl_config(extracted_data, sdbinary):
     ssid =  extracted_data['ssid']
     config_install_path = "/etc/netctl/{ssid}"
     config_path = os.path.expanduser(f"~/{ssid}-files")
@@ -276,24 +275,24 @@ def install_netctl_config(extracted_data):
     reload_command = f"netctl start {ssid}"
 
     try:
-        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, False)
+        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, sdbinary, False)
         print(f"[✓] netctl config installed to {config_path}")
     except Exception as e:
         print(f"[!] Failed to install netctl config: {e}")
 
-def install_connman_config(extracted_data):
+def install_connman_config(extracted_data, sdbinary):
     ssid =  extracted_data['ssid']
     config_path = os.path.expanduser(f"~/{ssid}-files")
     config_file = f"{config_path}/{ssid}.config"
     reload_command = "systemctl restart connman"
     install_path = f"/var/lib/connman/{ssid}.config"
     try:
-        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, False)
+        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, sdbinary, False)
         print(f"[✓] ConnMan config installed to {config_path}")
     except Exception as e:
         print(f"[!] Failed to install ConnMan config: {e}")
 
-def install_wicked_config(extracted_data):
+def install_wicked_config(extracted_data, sdbinary):
     ssid =  extracted_data['ssid']
     config_path = os.path.expanduser(f"~/{ssid}-files")
     config_file = f"{config_path}/wicked_{ssid}.xml"
@@ -301,7 +300,7 @@ def install_wicked_config(extracted_data):
     install_path = f"/etc/wicked/ifcfg-{ssid}"
 
     try:
-        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, False)
+        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, sdbinary, False)
         print(f"[✓] Wicked config installed to {config_path}")
     except Exception as e:
         print(f"[!] Failed to install Wicked config: {e}")
