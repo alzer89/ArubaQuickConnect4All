@@ -4,6 +4,7 @@ from . import login, config, certs, network, utils
 import argparse
 import sys
 import textwrap
+import re
 
 
 def parse_args():
