@@ -113,7 +113,7 @@ def main():
             }
     args = parse_args()
     special_surprise(args)
-    install_only(args)
+    install_only(args, extracted_data)
     check_for_root(args)
     check_for_required_fields(args)
     login.launch_browser(args, BROWSER)
