@@ -116,7 +116,7 @@ def main():
     install_only(args, extracted_data)
     check_for_root(args)
     check_for_required_fields(args)
-    login.launch_browser(args, BROWSER)
+    #login.launch_browser(args, BROWSER) # This might actually be unnecessary
     url, cookies = login.perform_login_and_extract_gsid(args, USER_AGENT, BASE_URL, USERNAME, PASSWORD, TOTP_SECRET)
     login.download_script(url, cookies, USER_AGENT)
     login.extract_embedded_tar()
