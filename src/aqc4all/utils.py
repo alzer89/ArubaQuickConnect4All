@@ -156,7 +156,7 @@ def prompt_to_install(args, extracted_data):
                     sdbinary = detect_sudo_or_doas()
                     if sdbinary == 'sudo' or sdbinary == 'doas':
                         if os.geteuid() != 0:
-                            subcommand.run([ sdbinary, 'true' ])
+                            subprocess.run([ sdbinary, 'true' ])
                 except:
                     print("Authentication unsuccessful.")
                     print(f"Configs and keys have been saved at ~/{extracted_data['ssid']}-files")
@@ -194,16 +194,16 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
 
         if extra_dirs:
             for dir in extra_dirs:
-                subcommand.run([ sdbinary, 'mkdir', '-p', newcert_path, newkey_path ], check=True)
+                subprocess.run([ sdbinary, 'mkdir', '-p', newcert_path, newkey_path ], check=True)
             #os.makedirs(extra_dirs, exist_ok=True)
 
         for v in old_certs:
             oldpath = f'{old_path}/{v}'
             newpath =  f'{newcert_path}/{ssid}_{v}'
             replace_string(config_file, oldpath, newpath)
-            subcommand.run([ sdbinary, 'cp', oldpath, newpath ])
-            subcommand.run([ sdbinary, 'chown', 'root:root', newpath ])
-            subcommand.run([ sdbinary, 'chmod', '600', newpath ])
+            subprocess.run([ sdbinary, 'cp', oldpath, newpath ])
+            subprocess.run([ sdbinary, 'chown', 'root:root', newpath ])
+            subprocess.run([ sdbinary, 'chmod', '600', newpath ])
             #shutil.copy2(oldpath, newpath)
             #os.chmod(newpath, 0o600)
 
@@ -212,21 +212,21 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
             newpath =  f'{newkey_path}/{ssid}_{v}'
             replace_string(config_file, f'{old_path}/{old_file}', f'{newkey_path}/{ssid}_{v}')
             replace_string(config_file, oldpath, newpath)
-            subcommand.run([ sdbinary, 'cp', oldpath, newpath ], check=True)
-            subcommand.run([ sdbinary, 'chown', 'root:root', newpath ], check=True)
-            subcommand.run([ sdbinary, 'chmod', '600', newpath ], check=True)
+            subprocess.run([ sdbinary, 'cp', oldpath, newpath ], check=True)
+            subprocess.run([ sdbinary, 'chown', 'root:root', newpath ], check=True)
+            subprocess.run([ sdbinary, 'chmod', '600', newpath ], check=True)
             #shutil.copy2(oldpath, newpath)
             #os.chmod(newpath, 0o600)
         if apppend:
-            subcommand.run([ sdbinary, 'cat', config_file, '>>', install_path ], check=True)
+            subprocess.run([ sdbinary, 'cat', config_file, '>>', install_path ], check=True)
             #f1 = open(install_path, 'a+')
             #f2 = open(config_file, 'r')
             #f1.write(f2.read())
             #f1.close()
             #f2.close()
         else:
-            subcommand.run([ sdbinary, 'cp', config_file, install_path ], check=True)
-            subcommand.run([ sdbinary, 'chmod', '600', install_path ], check=True)
+            subprocess.run([ sdbinary, 'cp', config_file, install_path ], check=True)
+            subprocess.run([ sdbinary, 'chmod', '600', install_path ], check=True)
             #shutil.copy2(config_file, install_path)
             #os.chmod(install_path, 0o600)
  
