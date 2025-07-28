@@ -5,6 +5,7 @@ import uuid
 import getpass
 import subprocess
 import re
+import time
 
 def replace_string(filename, old_string, new_string):
     try:
@@ -170,8 +171,8 @@ def prompt_to_install(args, extracted_data):
 def do_install(k, extracted_data, sdbinary):
     try:
         sdbinary = sdbinary.replace("passwordless_", "")
-    except:
-        pass
+    except Exception as e:
+        print(f"[!] Unexpected error: {e}")
     if k == "NetworkManager":
         install_networkmanager_config(extracted_data, sdbinary)
     elif k == "wpa_supplicant":
@@ -196,6 +197,7 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
         old_path = '/tmp/aqc'
 
         if extra_dirs:
+            dirs = extra_dirs if isinstance(extra_dirs, list) else [extra_dirs]
             for dir in extra_dirs:
                 subprocess.run([ sdbinary, 'mkdir', '-p', newcert_path, newkey_path ], check=True)
             #os.makedirs(extra_dirs, exist_ok=True)
@@ -220,19 +222,19 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
             #shutil.copy2(oldpath, newpath)
             #os.chmod(newpath, 0o600)
         if append:
-            subprocess.run([ sdbinary, 'cat', f'{config_path}/{config_file}', '>>', f'{install_path}/{config_file}' ], check=True)
+            subprocess.run([ sdbinary, 'sh', '-c', f'cat {config_path}/{config_file} >> {install_path}/{config_file}' ], check=True)
             #f1 = open(install_path, 'a+')
             #f2 = open(config_file, 'r')
             #f1.write(f2.read())
             #f1.close()
             #f2.close()
         else:
-            subprocess.run([ sdbinary, 'cp', f'{config_path}/{config_file}', '>>', f'{install_path}/{config_file}' ], check=True)
+            subprocess.run([ sdbinary, 'cp', f'{config_path}/{config_file}', f'{install_path}/{config_file}' ], check=True)
             subprocess.run([ sdbinary, 'chmod', '600', f'{install_path}/{config_file}' ], check=True)
             #shutil.copy2(config_file, install_path)
             #os.chmod(install_path, 0o600)
  
-        subprocess.run(sdbinary + reload_command.split(), check=True)
+        subprocess.run( [sdbinary] + reload_command.split(), check=True)
 
     except PermissionError:
         print(f"Permission denied. Root privileges required.")
