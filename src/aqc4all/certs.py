@@ -7,6 +7,7 @@ import time
 import json
 import requests
 import sys
+from OpenSSL import crypto
 
 def post_device_metadata(config_values, BASE_URL, USER_AGENT, mac_wifi, mac_eth="CA:FE:CO:FF:EE:99"):
     print("[*] Creating and posting device metadata payload...")
@@ -258,7 +259,6 @@ def fetch_and_parse_csrattrs(extracted_data, config_values, BASE_URL, USER_AGENT
     return parse_csrattrs_der(extracted_data, bin_path, txt_path)
 
 def generate_private_key_if_missing(extracted_data, key_path="/tmp/aqc/private_key.pem", debug=False):
-    from OpenSSL import crypto
 
     if not os.path.exists(key_path):
         print("[*] Creating private key...")
