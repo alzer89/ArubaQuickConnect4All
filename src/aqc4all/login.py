@@ -77,6 +77,7 @@ def launch_browser(args, USER_AGENT):
 from playwright.sync_api import sync_playwright
 import time
 
+# This will likely not be used, because playwright is 600MB+....
 def login_and_get_token(args, USER_AGENT, BASE_URL, USERNAME, PASSWORD, TOTP_SECRET):
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
@@ -154,16 +155,16 @@ def perform_login_and_extract_gsid(args, USER_AGENT, BASE_URL, USERNAME, PASSWOR
                 if "mdps_qc_profile.php?GSID=" in driver.page_source:
                     print("[✓] TOTP accepted, continuing...")
                     break
-                time.sleep(2)
+                #time.sleep(2)
             else:
                 print("[!] Timed out waiting for TOTP submission.")
 
-        time.sleep(2)
+        #time.sleep(2)
         if driver.find_elements(By.ID, "idSIButton9"):
             driver.find_element(By.ID, "idSIButton9").click()
             print("[>] Clicked 'Stay signed in'")
 
-        time.sleep(3)
+        #time.sleep(3)
         print("[*] Waiting for portal return URL with onboard path...")
         start_time = time.time()
         gsid = None
@@ -178,7 +179,7 @@ def perform_login_and_extract_gsid(args, USER_AGENT, BASE_URL, USERNAME, PASSWOR
                 download_url = f"{BASE_URL}/onboard/mdps_qc_profile.php?GSID={gsid}"
                 print("[✓] Direct download URL:", download_url)
                 break
-            time.sleep(2)
+            #time.sleep(2)
         if not gsid:
             print("[!] GSID not found within timeout.")
             download_url = None
