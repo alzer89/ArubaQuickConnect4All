@@ -168,9 +168,8 @@ def prompt_to_install(args, extracted_data):
                         do_install(k, extracted_data, sdbinary)
 
 def do_install(k, extracted_data, sdbinary):
-    sudo_or_doas = detect_sudo_or_doas
     try:
-        sudo_or_doas.replace("passwordless_", "")
+        sdbinary.replace("passwordless_", "")
     except:
         pass
     if k == "NetworkManager":
@@ -204,7 +203,7 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
         for v in old_certs:
             oldpath = f'{old_path}/{v}'
             newpath =  f'{newcert_path}/{ssid}_{v}'
-            replace_string(config_file, oldpath, newpath)
+            replace_string(f'{config_path}/{config_file}', oldpath, newpath)
             subprocess.run([ sdbinary, 'cp', oldpath, newpath ])
             subprocess.run([ sdbinary, 'chown', 'root:root', newpath ])
             subprocess.run([ sdbinary, 'chmod', '600', newpath ])
@@ -214,8 +213,7 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
         for v in old_keys:
             oldpath = f'{old_path}/{v}'
             newpath =  f'{newkey_path}/{ssid}_{v}'
-            replace_string(config_file, f'{oldpath}', f'{newpath}')
-            replace_string(config_file, oldpath, newpath)
+            replace_string(f'{config_path}/{config_file}', oldpath, newpath)
             subprocess.run([ sdbinary, 'cp', oldpath, newpath ], check=True)
             subprocess.run([ sdbinary, 'chown', 'root:root', newpath ], check=True)
             subprocess.run([ sdbinary, 'chmod', '600', newpath ], check=True)
@@ -253,7 +251,7 @@ def install_networkmanager_config(extracted_data, sdbinary):
     reload_command = "nmcli connection reload"
 
     try:
-        print(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, False)
+        #print(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, False)
         install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, False)
         print(f"[✓] NetworkManager config installed to {config_path}")
     except Exception as e:
