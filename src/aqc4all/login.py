@@ -22,7 +22,7 @@ def get_browser_driver_path(browser_name):
     for path in filter(None, candidates):
         if shutil.which(browser_name, path=path):
             return shutil.which(browser_name, path=path)
-    return None
+    return shutil.which(browser_name, path=path)
 
 def launch_browser(args, USER_AGENT):
     browser_choice = args.browser.lower() if args.browser else "chromium"
@@ -50,6 +50,9 @@ def launch_browser(args, USER_AGENT):
 
         # Configure Firefox options
         options = FirefoxOptions()
+
+        # Firefox on Arch and Nix most certainly doesn't like pretending it's Firefox on Ubuntu...
+        options.profile = profile
         options.add_argument(f"--profile-root={profile_root}") # added profile-root
 
         service = FirefoxService(executable_path=geckodriver_path)
