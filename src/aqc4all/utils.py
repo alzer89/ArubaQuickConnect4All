@@ -169,7 +169,7 @@ def prompt_to_install(args, extracted_data):
 
 def do_install(k, extracted_data, sdbinary):
     try:
-        sdbinary.replace("passwordless_", "")
+        sdbinary = sdbinary.replace("passwordless_", "")
     except:
         pass
     if k == "NetworkManager":
