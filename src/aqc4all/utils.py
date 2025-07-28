@@ -249,7 +249,7 @@ def install_networkmanager_config(extracted_data, sdbinary):
     reload_command = "nmcli connection reload"
 
     try:
-        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, sdbinary, False)
+        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, False)
         print(f"[✓] NetworkManager config installed to {config_path}")
     except Exception as e:
         print(f"[!] Failed to install NetworkManager config: {e}")
@@ -262,7 +262,7 @@ def install_wpa_supplicant_config(extracted_data, sdbinary):
     reload_command = "systemctl restart wpa_supplicant"
 
     try:
-        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, sdbinary, True)
+        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, True)
         print(f"[✓] wpa_supplicant config appended to {config_path}")
     except Exception as e:
         print(f"[!] Failed to install wpa_supplicant config: {e}")
@@ -275,7 +275,7 @@ def install_netctl_config(extracted_data, sdbinary):
     reload_command = f"netctl start {ssid}"
 
     try:
-        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, sdbinary, False)
+        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, False)
         print(f"[✓] netctl config installed to {config_path}")
     except Exception as e:
         print(f"[!] Failed to install netctl config: {e}")
@@ -287,7 +287,7 @@ def install_connman_config(extracted_data, sdbinary):
     reload_command = "systemctl restart connman"
     install_path = f"/var/lib/connman/{ssid}.config"
     try:
-        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, sdbinary, False)
+        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, False)
         print(f"[✓] ConnMan config installed to {config_path}")
     except Exception as e:
         print(f"[!] Failed to install ConnMan config: {e}")
@@ -300,7 +300,7 @@ def install_wicked_config(extracted_data, sdbinary):
     install_path = f"/etc/wicked/ifcfg-{ssid}"
 
     try:
-        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, sdbinary, False)
+        install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, False)
         print(f"[✓] Wicked config installed to {config_path}")
     except Exception as e:
         print(f"[!] Failed to install Wicked config: {e}")
