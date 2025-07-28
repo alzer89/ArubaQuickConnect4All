@@ -198,41 +198,30 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
 
         if extra_dirs:
             dirs = extra_dirs if isinstance(extra_dirs, list) else [extra_dirs]
-            for dir in extra_dirs:
-                subprocess.run([ sdbinary, 'mkdir', '-p', newcert_path, newkey_path ], check=True)
-            #os.makedirs(extra_dirs, exist_ok=True)
+            for directory in extra_dirs:
+                subprocess.run([ sdbinary, 'mkdir', '-p', newcert_path, newkey_path, directory ], check=True)
 
         for v in old_certs:
-            oldpath = f'{old_path}/{v}'
+            oldpath = f'{config_path}/{v}'
             newpath =  f'{newcert_path}/{ssid}_{v}'
             replace_string(f'{config_path}/{config_file}', oldpath, newpath)
             subprocess.run([ sdbinary, 'cp', oldpath, newpath ])
             subprocess.run([ sdbinary, 'chown', 'root:root', newpath ])
             subprocess.run([ sdbinary, 'chmod', '600', newpath ])
-            #shutil.copy2(oldpath, newpath)
-            #os.chmod(newpath, 0o600)
 
         for v in old_keys:
-            oldpath = f'{old_path}/{v}'
+            oldpath = f'{config_path}/{v}'
             newpath =  f'{newkey_path}/{ssid}_{v}'
             replace_string(f'{config_path}/{config_file}', oldpath, newpath)
             subprocess.run([ sdbinary, 'cp', oldpath, newpath ], check=True)
             subprocess.run([ sdbinary, 'chown', 'root:root', newpath ], check=True)
             subprocess.run([ sdbinary, 'chmod', '600', newpath ], check=True)
-            #shutil.copy2(oldpath, newpath)
-            #os.chmod(newpath, 0o600)
+
         if append:
-            subprocess.run([ sdbinary, 'sh', '-c', f'cat {config_path}/{config_file} >> {install_path}/{config_file}' ], check=True)
-            #f1 = open(install_path, 'a+')
-            #f2 = open(config_file, 'r')
-            #f1.write(f2.read())
-            #f1.close()
-            #f2.close()
+            subprocess.run([ sdbinary, 'sh', '-c', f'cat {config_path}/{config_file} >> {install_path}' ], check=True)
         else:
-            subprocess.run([ sdbinary, 'cp', f'{config_path}/{config_file}', f'{install_path}/{config_file}' ], check=True)
-            subprocess.run([ sdbinary, 'chmod', '600', f'{install_path}/{config_file}' ], check=True)
-            #shutil.copy2(config_file, install_path)
-            #os.chmod(install_path, 0o600)
+            subprocess.run([ sdbinary, 'cp', f'{config_path}/{config_file}', f'{install_path}' ], check=True)
+            subprocess.run([ sdbinary, 'chmod', '600', f'{install_path}' ], check=True)
  
         subprocess.run( [sdbinary] + reload_command.split(), check=True)
 
@@ -248,12 +237,11 @@ def install_networkmanager_config(extracted_data, sdbinary):
     ssid =  extracted_data['ssid']
     config_path = os.path.expanduser(f"~/{ssid}-files")
     config_file = f"{ssid}.nmconnection"
-    install_path = "/etc/NetworkManager/system-connections"
+    install_path = f"/etc/NetworkManager/system-connections/{config_file}"
     extra_dirs = os.path.expanduser(f"~/.config/NetworkManager")
     reload_command = "nmcli connection reload"
 
     try:
-        #print(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, False)
         install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, False)
         print(f"[✓] NetworkManager config installed to {config_path}")
     except Exception as e:
@@ -275,7 +263,7 @@ def install_wpa_supplicant_config(extracted_data, sdbinary):
 
 def install_netctl_config(extracted_data, sdbinary):
     ssid =  extracted_data['ssid']
-    config_install_path = "/etc/netctl/{ssid}"
+    install_path = "/etc/netctl/{ssid}"
     config_path = os.path.expanduser(f"~/{ssid}-files")
     config_file = f"netctl_{ssid}"
     reload_command = f"netctl start {ssid}"
