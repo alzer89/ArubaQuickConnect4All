@@ -210,11 +210,11 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
         for v in old_keys:
             oldpath = f'{old_path}/{v}'
             newpath =  f'{newkey_path}/{ssid}_{v}'
-            replace_string(config_file, f'{old_path}/{old_file}', f'{newkey_path}/{ssid}_{v}')
+            replace_string(config_file, f'{oldpath}', f'{newpath}')
             replace_string(config_file, oldpath, newpath)
             subprocess.run([ sdbinary, 'cp', oldpath, newpath ], check=True)
-            subprocess.run([ sdbinary, 'chown', 'root:root', f'{newpath}/{ssid}_{v}' ], check=True)
-            subprocess.run([ sdbinary, 'chmod', '600', f'{newpath}/{ssid}_{v}' ], check=True)
+            subprocess.run([ sdbinary, 'chown', 'root:root', newpath ], check=True)
+            subprocess.run([ sdbinary, 'chmod', '600', newpath ], check=True)
             #shutil.copy2(oldpath, newpath)
             #os.chmod(newpath, 0o600)
         if apppend:
