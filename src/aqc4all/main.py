@@ -38,8 +38,24 @@ def parse_args():
     parser.add_argument("--noclean", action="store_true", help="Do not clean /tmp/aqc after completion")
     parser.add_argument("--install-only", action="store_true", help="Install previously generated configs and certificates")
     parser.add_argument('--i-work-in-it', action="store_true", help="Special surprise for arrogant IT workers")
+    parser.add_argument('--yes-i-know-i-am-root-and-know-what-i-am-doing', action="store_true", help="Only use this if you know what you are doing...")
     return parser.parse_args()
 
+def check_for_root(args):
+    if os.geteuid() == 0:
+        if not args.yes_i_know_i_am_root_and_i_know_what_i_am_doing:
+            print("This opens a WEB BROWSER.  And you were about to do it as root.\n\nThis is generally NOT a good idea...\n\n")
+            print("Exiting...")
+            sys.exit(1)
+        else:
+            print("You have added '--yes-i-know-i-am-root-and-i-know-what-i-am-doing'.\n\nYou brave, brave soul...\n\n")
+            print("Are you 100% sure you want to proceed?")
+            proceed = input("Continue? [y/N]: ").strip().lower()
+            if proceed in ['y', 'Y', 'Yes', 'yEs', 'yeS', 'YES', 'yes', , 'YES!', 'YOLO', 'Skibidi Rizz']:
+                return 0
+            else:
+                sys.exit(1)
+ 
 def check_for_required_fields(args):
     import getpass
     global USERNAME, PASSWORD, BASE_URL, TOTP_SECRET, BROWSER
@@ -97,6 +113,7 @@ def main():
     args = parse_args()
     special_surprise(args)
     install_only(args)
+    check_for_root(args)
     check_for_required_fields(args)
     login.launch_browser(args, BROWSER)
     url, cookies = login.perform_login_and_extract_gsid(args, USER_AGENT, BASE_URL, USERNAME, PASSWORD, TOTP_SECRET)

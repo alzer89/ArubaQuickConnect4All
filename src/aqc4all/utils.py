@@ -150,7 +150,7 @@ def prompt_to_install(args, extracted_data):
             print("If you do not have this, you will not be able to install these configs")
         print("You can always, install these files manually, should you wish.")
         proceed = input("Continue? [y/N]: ").strip().lower()
-        if proceed in ['y', 'Y', 'Yes', 'yEs', 'yeS', 'YES', 'yes', 'Yeah, why not...']:
+        if proceed in ['y', 'Y', 'Yes', 'yEs', 'yeS', 'YES', 'yes', 'Yeah, why not...', 'Yes please']:
             if os.geteuid() != 0:
                 try:
                     sdbinary = detect_sudo_or_doas()
