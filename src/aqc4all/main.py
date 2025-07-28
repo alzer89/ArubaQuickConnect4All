@@ -51,7 +51,7 @@ def check_for_root(args):
             print("You have added '--yes-i-know-i-am-root-and-i-know-what-i-am-doing'.\n\nYou brave, brave soul...\n\n")
             print("Are you 100% sure you want to proceed?")
             proceed = input("Continue? [y/N]: ").strip().lower()
-            if proceed in ['y', 'Y', 'Yes', 'yEs', 'yeS', 'YES', 'yes', , 'YES!', 'YOLO', 'Skibidi Rizz']:
+            if proceed in ['y', 'Y', 'Yes', 'yEs', 'yeS', 'YES', 'yes', 'YES!', 'YOLO', 'Skibidi Rizz']:
                 return 0
             else:
                 sys.exit(1)
