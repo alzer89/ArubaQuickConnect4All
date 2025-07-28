@@ -151,7 +151,7 @@ def extract_credentials_from_plist(extracted_data, plist_path="/tmp/aqc/payload1
     except Exception as e:
         print(f"[!] Failed to extract credentials: {e}")
 
-def extract_certs_from_plist(plist_path="/tmp/aqc/payload1.plist"):
+def extract_certs_from_plist(extracted_data, plist_path="/tmp/aqc/payload1.plist"):
     print("[*] Extracting CA certificates from plist...")
     try:
         with open(plist_path, "rb") as f:
@@ -188,7 +188,7 @@ def extract_certs_from_plist(plist_path="/tmp/aqc/payload1.plist"):
         print(f"[!] Error extracting certs from plist: {e}")
         return False
 
-def parse_csrattrs_der(bin_path="/tmp/aqc/ca_csrattr.bin", txt_path="/tmp/aqc/ca_csrattr.txt"):
+def parse_csrattrs_der(extracted_data, bin_path="/tmp/aqc/ca_csrattr.bin", txt_path="/tmp/aqc/ca_csrattr.txt"):
     print("[*] Parsing ASN.1 CSR attributes using pyasn1...")
 
     try:
@@ -218,7 +218,7 @@ def parse_csrattrs_der(bin_path="/tmp/aqc/ca_csrattr.bin", txt_path="/tmp/aqc/ca
         print(f"[!] Failed to parse CSR attributes ASN.1: {e}")
         return False
 
-def fetch_and_parse_csrattrs(config_values, BASE_URL, USER_AGENT):
+def fetch_and_parse_csrattrs(extracted_data, config_values, BASE_URL, USER_AGENT):
     print("[*] Fetching CSR attributes from EST server...")
 
     est_url = config_values.get("root", {}).get("global.mdps_url")
@@ -255,7 +255,7 @@ def fetch_and_parse_csrattrs(config_values, BASE_URL, USER_AGENT):
     except Exception as e:
         print(f"[!] Failed to decode CSR attributes: {e}")
         return False
-    return parse_csrattrs_der(bin_path, txt_path)
+    return parse_csrattrs_der(extracted_data, bin_path, txt_path)
 
 def generate_private_key_if_missing(extracted_data, key_path="/tmp/aqc/private_key.pem", debug=False):
     from OpenSSL import crypto
