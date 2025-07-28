@@ -74,6 +74,37 @@ def launch_browser(args, USER_AGENT):
     else:
         raise ValueError("Unsupported browser: use 'chromium' or 'firefox'")
 
+from playwright.sync_api import sync_playwright
+import time
+
+def login_and_get_token(args, USER_AGENT, BASE_URL, USERNAME, PASSWORD, TOTP_SECRET):
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)
+        page = browser.new_page()
+        page.goto(onboard_url)
+
+        # Microsoft login page:
+        page.fill('input[type="email"]', username)
+        page.click('input[type="submit"]')
+        page.wait_for_selector('input[type="password"]', timeout=60000)
+        page.fill('input[type="password"]', password)
+        page.click('input[type="submit"]')
+        page.wait_for_selector('input[type="password"]', timeout=60000)
+        page.fill('input[type="password"]', password)
+        page.click('input[type="submit"]')
+
+        # Wait for TOTP manually
+        print("Please complete TOTP in browser, then press Enter...")
+        input()
+
+        # Wait until redirected back to onboarding path
+        page.wait_for_url("**/onboard/**", timeout=120000)
+        current_url = page.url
+        print("Redirected to:", current_url)
+
+        # At this point you can retrieve GSID or other query params
+        browser.close()
+        return current_url
 
 def perform_login_and_extract_gsid(args, USER_AGENT, BASE_URL, USERNAME, PASSWORD, TOTP_SECRET):
     session = requests.Session()
