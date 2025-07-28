@@ -137,7 +137,7 @@ def detect_sudo_or_doas():
 def prompt_to_install(args, extracted_data):
     if not args.noinstall:
         detected = detect_network_stack()
-        command = passwordless_sudo_or_doas()
+        command = detect_sudo_or_doas()
         print("[*] Detected the following network stack:")
         for k, v in detected.items():
             if v:
