@@ -188,8 +188,8 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
     try:
         ssid =  extracted_data['ssid']
         config_path = os.path.expanduser(f"~/{ssid}-files")
-        newcert_path = "/etc/ssl/certs"
-        newkey_path = "/etc/ssl/private"
+        newcert_path = '/etc/ssl/certs'
+        newkey_path = '/etc/ssl/private'
         old_certs = ['ca_root.pem', 'client.pem']
         old_keys = [ 'private_key.pem']
         old_path = '/tmp/aqc'
@@ -198,7 +198,7 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
             os.makedirs(extra_dirs, exist_ok=True)
 
         for v in old_certs:
-            oldpath = f'{old_path}{v}'
+            oldpath = f'{old_path}/{v}'
             newpath =  f'{newcert_path}/{ssid}_{v}'
             replace_string(config_file, oldpath, newpath)
             shutil.copy2(oldpath, newpath)
