@@ -317,7 +317,7 @@ def generate_csr_from_key():
     csr_config_path = "/tmp/aqc/csr_config.cnf"
     with open(csr_config_path, "w") as f:
         f.write("""[ req ]
-default_bits       = 2048
+default_bits       = 4096
 distinguished_name = req_distinguished_name
 prompt             = no
 
