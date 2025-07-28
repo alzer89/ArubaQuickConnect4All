@@ -88,7 +88,8 @@ wpa_supplicant_wlan0="-Dnl80211 -c/etc/wpa_supplicant/wpa_supplicant_{extracted_
     created_configs.append(f"{net_path}")
 
 def generate_apple_mobileconfig(created_configs, extracted_data, cert_path="/tmp/aqc/client.pem", key_path="/tmp/aqc/private_key.pem"):
-    mobileconfig_path = f"/tmp/aqc/{extracted_data['ssid']}.mobileconfig"
+    ssid = extracted_data['ssid']
+    mobileconfig_path = f"/tmp/aqc/{ssid}.mobileconfig"
     payload_uuid = str(uuid.uuid4())
     with open(mobileconfig_path, "w") as f:
         f.write(f"""<?xml version="1.0" encoding="UTF-8"?>
