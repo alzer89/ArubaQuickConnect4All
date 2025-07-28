@@ -213,20 +213,20 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
             replace_string(config_file, f'{old_path}/{old_file}', f'{newkey_path}/{ssid}_{v}')
             replace_string(config_file, oldpath, newpath)
             subprocess.run([ sdbinary, 'cp', oldpath, newpath ], check=True)
-            subprocess.run([ sdbinary, 'chown', 'root:root', newpath ], check=True)
-            subprocess.run([ sdbinary, 'chmod', '600', newpath ], check=True)
+            subprocess.run([ sdbinary, 'chown', 'root:root', f'{newpath}/{ssid}_{v}' ], check=True)
+            subprocess.run([ sdbinary, 'chmod', '600', f'{newpath}/{ssid_v{}' ], check=True)
             #shutil.copy2(oldpath, newpath)
             #os.chmod(newpath, 0o600)
         if apppend:
-            subprocess.run([ sdbinary, 'cat', config_file, '>>', install_path ], check=True)
+            subprocess.run([ sdbinary, 'cat', f'{config_path}/{config_file}', '>>', f'{install_path}/{config_file}' ], check=True)
             #f1 = open(install_path, 'a+')
             #f2 = open(config_file, 'r')
             #f1.write(f2.read())
             #f1.close()
             #f2.close()
         else:
-            subprocess.run([ sdbinary, 'cp', config_file, install_path ], check=True)
-            subprocess.run([ sdbinary, 'chmod', '600', install_path ], check=True)
+            subprocess.run([ sdbinary, 'cp', f'{config_path}/{config_file}', '>>', f'{install_path}/{config_file}' ], check=True)
+            subprocess.run([ sdbinary, 'chmod', '600', f'{install_path}/{config_file}' ], check=True)
             #shutil.copy2(config_file, install_path)
             #os.chmod(install_path, 0o600)
  
@@ -243,12 +243,13 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
 def install_networkmanager_config(extracted_data, sdbinary):
     ssid =  extracted_data['ssid']
     config_path = os.path.expanduser(f"~/{ssid}-files")
-    config_file = f"{config_path}/{ssid}.nmconnection"
+    config_file = f"{ssid}.nmconnection"
     install_path = "/etc/NetworkManager/system-connections"
     extra_dirs = os.path.expanduser(f"~/.config/NetworkManager")
     reload_command = "nmcli connection reload"
 
     try:
+        print(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, False)
         install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, False)
         print(f"[✓] NetworkManager config installed to {config_path}")
     except Exception as e:
@@ -258,8 +259,9 @@ def install_wpa_supplicant_config(extracted_data, sdbinary):
     ssid =  extracted_data['ssid']
     install_path = "/etc/wpa_supplicant/wpa_supplicant.conf"
     config_path = os.path.expanduser(f"~/{ssid}-files")
-    config_file = f"{config_path}/wpa_supplicant_{ssid}.conf"
+    config_file = f"wpa_supplicant_{ssid}.conf"
     reload_command = "systemctl restart wpa_supplicant"
+    extra_dirs = None
 
     try:
         install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, True)
@@ -271,8 +273,9 @@ def install_netctl_config(extracted_data, sdbinary):
     ssid =  extracted_data['ssid']
     config_install_path = "/etc/netctl/{ssid}"
     config_path = os.path.expanduser(f"~/{ssid}-files")
-    config_file = f"{config_path}/netctl_{ssid}"
+    config_file = f"netctl_{ssid}"
     reload_command = f"netctl start {ssid}"
+    extra_dirs = None
 
     try:
         install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, False)
@@ -283,9 +286,10 @@ def install_netctl_config(extracted_data, sdbinary):
 def install_connman_config(extracted_data, sdbinary):
     ssid =  extracted_data['ssid']
     config_path = os.path.expanduser(f"~/{ssid}-files")
-    config_file = f"{config_path}/{ssid}.config"
+    config_file = f"{ssid}.config"
     reload_command = "systemctl restart connman"
     install_path = f"/var/lib/connman/{ssid}.config"
+    extra_dirs = None
     try:
         install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, False)
         print(f"[✓] ConnMan config installed to {config_path}")
@@ -295,9 +299,10 @@ def install_connman_config(extracted_data, sdbinary):
 def install_wicked_config(extracted_data, sdbinary):
     ssid =  extracted_data['ssid']
     config_path = os.path.expanduser(f"~/{ssid}-files")
-    config_file = f"{config_path}/wicked_{ssid}.xml"
+    config_file = f"wicked_{ssid}.xml"
     reload_command = "systemctl restart wicked"
     install_path = f"/etc/wicked/ifcfg-{ssid}"
+    extra_dirs = None
 
     try:
         install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, False)
