@@ -10,16 +10,18 @@ import os
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Aruba QuickConnect 4 ALL (Linux Distros)",
+        description="Aruba QuickConnect 4 ALL (Linux and BSD Distros)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=textwrap.dedent("""
         This script will:
+            - Automatically detect your OS parameters (kernel, package manager, etc.)
             - Automatically detect your installed and running network components
+            - With your permission, automatically install any missing dependencies
             - Perform authentication with an Aruba QuickConnect onboarding portal
-            - Download and extract ArubaQuickConnect installer
+            - Download and extract ArubaQuickConnect installer (but never actually touch it)
             - Generate private key and certificate signing request
-            - Enroll with the Aruba QuickConnect (EST) server
-            - Output and persist configuration files for various network systems
+            - Enrol with the Aruba QuickConnect (EST) server
+            - Generate and persist configuration files for various network systems
             - Install config files and certs on request (or leave them in a folder for you)
             - Purge that Aruba filth from your glorious *-nix machine
 
@@ -95,8 +97,69 @@ def check_for_required_fields(args):
 
 def special_surprise(args):
     if args.i_work_in_it:
-        print("\033[95mWelcome to the secret BEANS mode!\033[0m")
-        exit(0)
+        print("""
+This is a message to everyone who works in IT support:
+
+Every time you tell someone something "doesn't work on Linux"....
+
+             YOU ARE GASLIGHTING AND THIS NEEDS TO STOP!
+
+Maybe you say that because it's "less work", maybe you say it because
+your boss told you to, or maybe you're just STUPID.  I don't know...
+
+You probably migrated part of your INTELLIGENCE along with your servers
+when you "put them in the cloud" that command line is "just too hard" 
+for you... *I'm playing the world's smallest violin for you*
+
+That's like being a mechanic who is capable of DRIVING the cars they're
+fixing...
+
+Do everyone a favour and extinguish those gaslit flames ASAP, because when
+you *do* eventually run into a Linux user worth their salt (it's inevitable),
+and you try to flame them, they will NOT take any of it, and they will wipe
+the floor with you, make a mockery of you, and they will not hold back.  
+
+Secondly, and much more importantly...
+
+         STOP TAKING VENDOR'S AT THEIR WORD.  THEY ARE LAZY!
+
+This program the perfect example of how easy it was to reverse-engineer
+something that you likely paid the equivalent of a HOME LOAD DEPOSIT to
+be able to deploy.  
+
+How does it feel that a bunch of Linux users managed to break it on 
+their lunch break, and show you that all the "security" that they promised
+you is essentially a BIG JOKE.
+
+IT PEASANTS:    "Oh no, it's impossible.  It cannot be done.  Never."
+LINUX USERS: "Hehehehe.....curl go brrrrrrrrrrrrrrr........"
+BSD USERS:   "Hehehehe.....kldload also go brrrrrrrrrrrr..."
+
+        ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠋⠉⣿⠉⠉⣿⠀⠐⡏⠉⠉⢻⡏⠉⠉⢿⢰⡏⠉⠉⢹⡀⡏⠉⢉⠉⠙⢷⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+        ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⠀⠀⢺⠀⠀⣚⣀⣠⡇⠀⠀⠘⠁⠀⠀⣻⣼⠀⢰⡀⠈⣇⡇⠀⢸⡇⠀⢸⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+        ⠀⠀⠀⠀⠀⠀⠀⠀⣠⡾⢿⠀⠀⣻⠀⠀⣿⢉⣽⡇⠀⢧⠀⠀⡇⠀⢼⡿⠀⢸⡇⠀⢿⡇⠀⢸⡇⠀⢸⣇⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+        ⠀⠀⠀⠀⠀⠀⢠⣾⠏⠀⢸⡄⠀⢿⠀⠀⣿⣡⠴⡇⠀⣹⠀⢠⡇⠀⢺⡇⠀⢀⡅⠀⢸⡇⠀⠸⠇⠀⢸⡏⠙⠷⣦⣄⡀⠀⠀⠀⠀⠀
+        ⠀⠀⠀⠀⠀⢠⣿⠃⠀⠀⢈⡷⢤⣀⣠⣼⠧⠖⠚⢧⡤⠼⢧⠼⢧⡤⠽⢤⡤⠼⠧⣤⣬⢧⡤⢤⠤⠤⢾⡁⠀⠀⠈⠙⢿⡆⠀⠀⠀⠀
+        ⠀⠀⠀⠀⢠⣿⠃⠀⠀⠀⠀⢠⠊⢠⠊⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⢠⡞⠀⠀⠀⠀⠀⠀⠙⡄⠀⠀⠀⢸⣧⠀⠀⠀⠀
+        ⠀⠀⠀⣠⣾⠏⠀⠀⠀⠀⠀⠀⠀⠀⣠⣴⣾⣿⣿⣿⡿⠿⢶⣦⣄⠀⠀⠀⠀⠀⠀⠨⠀⢀⣀⣠⣤⣤⣀⠀⠀⠀⠀⠀⠈⢿⣆⡀⠀⠀
+        ⠀⣠⡾⣿⠿⠎⠍⠢⡀⠀⠰⠶⠃⢸⣿⡶⠿⠿⠿⠿⢷⣦⣄⡈⣻⣷⠀⠀⠀⢠⣤⣠⣾⣿⣿⣿⡿⠿⠿⠷⠠⠖⠶⠤⠤⣌⠻⣷⣄⠀
+        ⣾⢋⡞⠁⣠⡶⠟⠛⢛⠿⣷⣦⣄⣀⡀⣀⣠⣴⡟⠁⠀⠀⠉⠛⠛⠁⠀⠀⠀⠀⠉⢻⡏⠁⠀⠀⠀⠀⠀⠀⢀⣠⣤⣄⡙⢢⡙⣌⢿⡇
+        ⡏⢸⠀⣰⡟⠀⠀⢀⣿⣄⣀⠈⠉⠉⠛⠉⠉⠁⠀⠀⠀⠀⠀⠀⣀⠀⠀⠀⠀⠀⠀⢹⣷⣄⠀⠀⠀⠿⣶⣾⡟⢩⡍⠉⠛⠀⡇⠸⣿⡇
+        ⡇⢸⡀⢹⣇⢠⠾⢿⣏⠉⠛⠿⣶⣤⣀⡀⠀⠀⠤⠤⠄⠚⣾⠟⠛⣃⣀⡀⠀⠀⠀⠀⠈⢻⣷⣤⡀⠀⠀⠀⠀⢸⣧⠀⠀⡴⠃⣸⣿⠃
+        ⣷⡄⢧⡀⠻⠀⠀⠈⣿⣦⣀⠀⠀⢹⡿⠻⠿⣶⣤⣄⣀⠀⠻⣷⠘⠛⠛⠛⠃⢀⣀⢀⣴⠿⠉⠃⠈⠑⠂⢀⣤⣿⣿⣧⠀⠞⢋⣿⠃⠀
+         ⠻⣦⣍⠀⠀⠀⠀⠈⢿⣿⠻⢶⣾⣿⣤⡀⠀⠀⠉⠙⣿⠿⠶⣶⣦⣤⣤⣄⣀⣙⣛⣁⣀⣀⣤⣤⣶⡾⠿⣿⠹⣿⣿⠀⢀⣿⠏⠀⠀
+         ⠀⠉⢿⣦⠀⠀⠀⠀⠀⠻⣧⡀⢹⣿⠿⢿⣿⣶⣦⣼⣿⠀⠀⠀⠀⠈⢻⡏⠉⠙⠛⣿⡏⠉⠉⠉⣿⡄⢀⣿⣤⣿⣿⠀⢨⣿⠀⠀⠀
+        ⠀⠀⠀⠀⢻⣇⠀⠀⠀⠀⠀⠘⢿⣾⡏⠀⠀⠈⠉⠛⣿⠿⣿⣿⣷⣶⣶⣿⣷⣶⣶⣶⣿⣶⣶⣶⣿⣿⣿⣿⣿⣿⣿⣿⠀⢸⣿⠀⠀⠀
+        ⠀⠀⠀⠀⠈⢿⣦⠀⠀⠀⠀⠀⠀⠙⠿⣷⣄⡀⠀⣰⡿⠀⠀⠈⠉⠙⢻⡿⠿⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢿⣿⣿⡇⠀⢈⣿⠀⠀⠀
+        ⠀⠀⠀⠀⠀⠀⠙⢿⣦⡀⠤⣀⡀⠠⣀⡈⠙⠿⢶⣿⣅⣀⠀⠀⠀⠀⣾⡇⠀⠀⠀⣸⡏⠀⢀⣾⠇⢠⣿⢁⣿⣿⠟⠀⠀⠀⣿⠀⠀⠀
+        ⠀⠀⠀⠀⠀⠀⠀⠀⠛⢿⣤⣘⠻⣧⣀⣛⣧⣄⡀⣛⣻⣿⣿⣿⣧⣤⣿⣤⣄⣀⣠⣿⣄⣠⣼⣿⣤⣿⣿⡿⠿⠃⠀⠀⠀⠀⣿⡇⠀⠀
+        ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⢿⠁⠈⣀⠉⠙⣿⡇⠀⢁⡈⠉⣧⣽⠋⢀⡀⠉⢻⣹⠋⠁⣤⠈⠹⡄⠀⠀⣠⠆⠀⢠⡄⠀⢻⡇⠀⠀
+        ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠿⠀⢀⣿⡇⠀⠸⠇⠀⣼⡇⠀⢸⡇⠀⢸⡿⣤⣤⣿⠀⠀⡷⠚⠋⠁⣀⣠⠜⠀⠀⢸⡇⠀⠀
+        ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⣤⠀⠉⣿⡇⠀⢠⡄⠈⣷⡇⠀⢸⡇⠀⢸⣿⠉⠉⠋⠀⢀⡗⠒⠛⠋⠉⠀⠀⠀⢀⣾⠇⠀⠀
+        ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠻⠀⠀⣽⡇⠀⢸⡇⠀⣻⣇⠀⠸⠇⠀⢸⣿⠶⠶⡟⠛⠉⠀⠀⠀⠀⠀⢀⣀⣴⡾⠋⠀⠀⠀
+        ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⠦⠶⠴⠦⠒⠋⠷⠤⠞⠳⠤⠟⠈⠳⠤⠤⠶⠋⠙⠦⠤⠟⠻⠷⠶⠶⠾⠿⠛⠛⠋⠁⠀⠀⠀⠀⠀
+              """)
+        sys.exit(0)
 
 def install_only(args, extracted_data):
     if args.install_only:
