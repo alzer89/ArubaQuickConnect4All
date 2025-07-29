@@ -43,7 +43,7 @@ def generate_netplan_yaml(created_configs, extracted_data, cert_path="/tmp/aqc/c
   wifis:
     NM-{con_uuid}:
       renderer: NetworkManager
-      match: \{\}
+      match: {{}}
       dhcp4: true
       dhcp6: true
       access-points:

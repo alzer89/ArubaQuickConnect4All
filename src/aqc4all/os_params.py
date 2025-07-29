@@ -175,7 +175,7 @@ def pkgmanager_commands(args, package_manager):
                     'upgrade_command': ['upgrade', space],
                     'install_command': ['add', space],
                     'remove_command': ['remove', space],
-                    'force_command': ['']
+                    'force_command': [''],
                     'yes_command': [''],
                     }
             break
@@ -236,6 +236,12 @@ def check_for_dependencies(args):
         try:
             if shutil.which('chromium') or shutil.which('google-chrome'):
                 browser_driver = 'chromedriver'
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+            sys.exit(1)
+        except:
+            print("Unknown error occurred.")
+            sys.exit(1)
     return browser_driver
 
 def check_for_driver(args, browser_driver):
