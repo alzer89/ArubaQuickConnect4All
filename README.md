@@ -47,16 +47,13 @@ cd aqc4all
 pip install .
 ```
 
-### Firefox
-The `geckodriver` is currently required to allow ArubaQuickConnect4All to control a Firefox window, and this needs to be install separately.  
+## Browser Requirements
+`geckodriver` (for Firefox) and/or `chromedriver` (for Chromium) is currently required to allow ArubaQuickConnect4All to control a Firefox window, and `aqc4all` will prompt you if you wish to install this as part of the process.  You can, of course, install it yourself manually if you wish.  Be warned that very few distros will keep copies of `geckodriver` in their (stable) repos.
 
-### Chromium
-`chromedriver` is currently required to allow ArubaQuickConnect4All to control a Chromium window, and this needs to be install separately.  
-
-Work is being done to submit it to PyPi.
+## PyPi Package
+Work is being done to submit this to PyPi as a standalone package.
 
 ## Usage
-
 Literally just run `aqc4all`, and it'll guide you through the steps. 
 
 For advanced options:
