@@ -263,8 +263,8 @@ def install_driver(args, package_manager, browser_driver):
             cmd = ['sudo', package_manager['name'], package_manager['install_command'], 'geckodriver', package_manager['yes_command']]
             subprocess.run(cmd)
             return True
-        except as e:
-            print(f"Install unsuccessful: {e}")
+        except:
+            print(f"Install unsuccessful,")
             sys.exit(1)
     else:
         print("Already Installed")
