@@ -43,16 +43,6 @@ def parse_args():
     return parser.parse_args()
 
 
-def check_for_dependencies(args):
-    if firefox in args.browser:
-        # Check for geckodriver in PATH
-        pass
-    elif chromium in args.browser:
-        #Check for chromedriver in PATH
-        pass
-    else:
-        # Throw an error
-
 
 def check_for_root(args):
     if os.geteuid() == 0:
