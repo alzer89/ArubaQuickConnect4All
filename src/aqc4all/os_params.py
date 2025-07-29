@@ -222,7 +222,7 @@ def pkgmanager_commands(args, package_manager):
 
 def check_for_dependencies(args):
     browser_driver = None
-    if 'firefox' in args.browser:
+    if args.browser == 'firefox':
         try:
             if shutil.which('firefox'):
                 browser_driver = 'geckodriver'
@@ -232,7 +232,7 @@ def check_for_dependencies(args):
         except:
             print("Unknown error occurred.")
             sys.exit(1)
-    elif 'chromium' in args.browser:
+    elif args.browser == 'chromium':
         try:
             if shutil.which('chromium') or shutil.which('google-chrome'):
                 browser_driver = 'chromedriver'

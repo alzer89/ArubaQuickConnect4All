@@ -167,6 +167,12 @@ def prompt_to_install(args, extracted_data):
                     proceed = input(f"Install config for {k}? [y/n]: ").strip().lower()
                     if proceed in ['y', 'Y', 'Yes', 'yEs', 'yeS', 'YES', 'yes']:
                         do_install(k, extracted_data, sdbinary)
+        else:
+            print("#################################")
+            print("    Installation cancelled       ")
+            print("#################################")
+            print(f"All generated files have been saved to ~/{extracted_data['ssid']}-files/")
+            print("You can always manually install them if you wish.")
 
 def do_install(k, extracted_data, sdbinary):
     try:

@@ -40,6 +40,7 @@ def parse_args():
     parser.add_argument("--install-only", action="store_true", help="Install previously generated configs and certificates")
     parser.add_argument('--i-work-in-it', action="store_true", help="Special surprise for arrogant IT workers")
     parser.add_argument('--yes-i-know-i-am-root-and-know-what-i-am-doing', action="store_true", help="Only use this if you know what you are doing...")
+    parser.add_argument('--welcome-only', action="store_true", help="Show the absolutely glroious logo that I took 2 hours to make MANUALLY in vim")
     return parser.parse_args()
 
 
@@ -102,6 +103,28 @@ def install_only(args, extracted_data):
         utils.prompt_to_install(args, extracted_data)
         exit(0)
 
+def welcome_message(args):
+    print('''
+     @@@@@@@@@@:         *@@@@@@@@@@          @@@@@@@@ @@@@                   @@@@@@@@@@       #@@@@   #@@@@
+  .@@@@@@@@@@@@@@+     @@@@@@@@@@@@@@@      @@@@@@@@@@ @@@@    @@@%-        .@@@@@@@@@@@@@@.   #@@@@   #@@@@
+ %@@@@@      @@@@@@   @@@@@#     -@@@@@.  #@@@@@.      @@@@    @@@@@       %@@@@@      @@@@@%  #@@@@   #@@@@
+.@@@@.         @@@@% @@@@@         #@@@@  .@@@@:       @@@@    @@@@+      -@@@@          @@@@- #@@@@   #@@@@
+@@@@%          =@@@@ @@@@           @@@@+ .@@@@:       @@@@    %@@@@      @@@@#          *@@@@ #@@@@   #@@@@
+@@@@@          =@@@@ @@@@           @@@@# @@@@@        @@@@@@@@@@@@@@@@@@ @@@@*          *@@@@ *@@@@   *@@@@
+.@@@@:         @@@@@ @@@@@         %@@@@# @@@@%          %@@@@@%@@@@@@@@# @@@@@          @@@@=  @@@@*   @@@@*
+ #@@@@@.     @@@@@@@  @@@@@@     +@@@@@@# .@@@@.               %@@@@       %@@@@@      @@@@@@=  =@@@@@: =@@@@@:
+   @@@@@@@@@@@@@@@@@   @@@@@@@@@@@@@@@@@#  %@@@@@              %@@@@        %@@@@@@@@@@@@@@@@-   @@@@@@@ @@@@@@@
+     @@@@@@@@@@@@@@@    -@@@@@@@@@%@@@@#   .@@@@@@@@@@         %@@@@          %@@@@@=@@@@@@@@=     @@@@@>  @@@@@>
+                @@@@              @@@@@#      @@@@@@@@         %@@@@                     @@@@-
+                  @@              #@@@@#                                                   @@=
+                                   #@@##
+                    ''')
+    print("                          The Swiss Army Knife of Aruba ClearPass QuickConnect")
+    print("       If your IT department is going to force you onto a Wi-Fi network, at least it'll be on YOUR terms")
+    print("\n\n\n")
+    if args.welcome_only:
+        sys.exit(0)
+
 def main():
     USER_AGENT = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"
     created_configs = []
@@ -115,10 +138,11 @@ def main():
             }
     args = parse_args()
     special_surprise(args)
+    welcome_message(args)
     install_only(args, extracted_data)
     check_for_root(args)
-    browser_driver = check_for_dependencies(args)
-    check_for_driver(args, browser_driver)
+    browser_driver = os_params.check_for_dependencies(args)
+    os_params.check_for_driver(args, browser_driver)
     check_for_required_fields(args)
     #login.launch_browser(args, BROWSER) # This might actually be unnecessary
     url, cookies = login.perform_login_and_extract_gsid(args, USER_AGENT, BASE_URL, USERNAME, PASSWORD, TOTP_SECRET)
