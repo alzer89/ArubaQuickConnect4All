@@ -34,6 +34,45 @@ method=auto
     print(f"[✓] NetworkManager profile written to {nm_path}")
     created_configs.append(f"{nm_path}")
 
+def generate_netplan_yaml(created_configs, extracted_data, cert_path="/tmp/aqc/client.pem", key_path="/tmp/aqc/private_key.pem"):
+    con_uuid = uuid.uuid4()
+    netplan_path = f"/tmp/aqc/{extracted_data['ssid']}.yaml"
+    with open(nm_path, "w") as f:
+        f.write(f"""network:
+  version: 2
+  wifis:
+    NM-{con_uuid}:
+      renderer: NetworkManager
+      match: \{\}
+      dhcp4: true
+      dhcp6: true
+      access-points:
+        "{extracted_data['ssid']}":
+          auth:
+            key-management: "eap"
+            method: "tls"
+            identity: "{extracted_data['username']}"
+            ca-certificate: "{extracted_data['root_cert']}"
+            client-certificate: "{cert_path}"
+            client-key: "{key_path}"
+            client-key-password: "{extracted_data['password']}"
+            phase2-auth: "mschapv2"
+            password: "{extracted_data['password']}"
+          networkmanager:
+            uuid: "{con_uuid}"
+            name: "{extracted_data['ssid']}"
+            passthrough:
+              connection.autoconnect: "false"
+              ipv6.addr-gen-mode: "default"
+              ipv6.ip6-privacy: "-1"
+              proxy._: ""
+      networkmanager:
+        uuid: "{con_uuid}"
+        name: "{extracted_data['ssid']}"
+""")
+    print(f"[✓] NetPlan YAML written to {netplan_path}")
+    created_configs.append(f"{netplan_path}")
+
 def generate_wpa_supplicant_config(created_configs, extracted_data, cert_path="/tmp/aqc/client.pem", key_path="/tmp/aqc/private_key.pem"):
     wpa_path = f"/tmp/aqc/wpa_supplicant_{extracted_data['ssid']}.conf"
     with open(wpa_path, "w") as f:

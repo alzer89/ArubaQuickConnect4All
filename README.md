@@ -15,7 +15,7 @@ So we built this.
 `aqc4all` automates and simplifies the Aruba QuickConnect enrollment process for all Linux systems. Here's what it does differently (and better):
 - Spoofs the User-Agent to trick the Aruba portal into handing over the precious installer
 - Extracts only the relevant part (read: a one-time pad (OTP) from a config.ini file) from their bloated 43MB installer
-- Generates secure, modern keypairs (unlike the official tool, which requires downgrading OpenSSL 🤦)
+- Generates secure, modern keypairs (unlike the official tool, which requires downgrading OpenSSL)
 - Sends the public key to Aruba’s EST server, retrieves a signed certificate and the CA
 - Optionally installs configuration files for:
     - `NetworkManager`
@@ -29,15 +29,15 @@ So we built this.
 
 It will also generate Android configs for you that aren't locked up with someone else's key, so you can change them!
 
-Currently, it only supports Firefox and Chromium.  Chromium-based browser should also work, however that has not been tested yet.  
+Currently, it only supports Firefox and Chromium.  Chromium-based browsers should also work, however that has not been tested yet.  
 
-Same for BSD support.  There's no reason it shouldn't work, we just haven't testing it yet.
+Same for BSD support.  There's no reason it shouldn't work, we just haven't tested it yet.
 
 ## Why use this and not the official tool?
 - Works on any Linux distribution (and likely BSD)
 - Works with almost any networking components
-   - And saves the raw files, so you can manually configure it late, if you choose
-- Generate key lengths that are actually considered "safe"
+   - And saves the raw files, so you can manually configure it later, if you choose
+- Generates key lengths that are actually considered "safe" (minimum 4096-bit)
 - Much more transaparent than the official tool
 
 ## Installation
@@ -46,6 +46,12 @@ git clone https://github.com/alzer89/aqc4all
 cd aqc4all
 pip install .
 ```
+
+### Firefox
+The `geckodriver` is currently required to allow ArubaQuickConnect4All to control a Firefox window, and this needs to be install separately.  
+
+### Chromium
+`chromedriver` is currently required to allow ArubaQuickConnect4All to control a Chromium window, and this needs to be install separately.  
 
 Work is being done to submit it to PyPi.
 

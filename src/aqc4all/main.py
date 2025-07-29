@@ -42,6 +42,21 @@ def parse_args():
     parser.add_argument('--yes-i-know-i-am-root-and-know-what-i-am-doing', action="store_true", help="Only use this if you know what you are doing...")
     return parser.parse_args()
 
+def detect_os(args):
+    # Detect OS, so that package manager can be determined
+    pass
+
+def check_for_dependencies(args):
+    if firefox in args.browser:
+        # Check for geckodriver in PATH
+        pass
+    elif chromium in args.browser:
+        #Check for chromedriver in PATH
+        pass
+    else:
+        # Throw an error
+
+
 def check_for_root(args):
     if os.geteuid() == 0:
         if not args.yes_i_know_i_am_root_and_i_know_what_i_am_doing:
