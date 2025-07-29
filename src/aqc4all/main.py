@@ -131,6 +131,9 @@ How does it feel that a bunch of Linux users managed to break it on
 their lunch break, and show you that all the "security" that they promised
 you is essentially a BIG JOKE.
 
+Most importantly, your gaslighting is putting people's online safety at
+risk, and it can easily be fixed if you just QUESTION THE STATUS QUO.
+
 IT PEASANTS:    "Oh no, it's impossible.  It cannot be done.  Never."
 LINUX USERS: "Hehehehe.....curl go brrrrrrrrrrrrrrr........"
 BSD USERS:   "Hehehehe.....kldload also go brrrrrrrrrrrr..."
