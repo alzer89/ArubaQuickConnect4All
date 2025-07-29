@@ -68,9 +68,9 @@ def which_package_manager():
             confirm = input("Unrecognised option.\nEnter number or name: ")
     return response
 
-def pkgmanager_commands(args, os_id):
-    space = ''
-    os_id = list(os_id)
+def pkgmanager_commands(args, package_manager):
+    space = ' '
+    os_id = list(package_manager)
     for value in os_id:    
         if 'snap' in value:
             package_manager = {
@@ -220,21 +220,45 @@ def pkgmanager_commands(args, os_id):
     return package_manager
 
 
-def check_for_dependencies(args, package_manager):
+def check_for_dependencies(args):
     browser_driver = None
-    if shutil.which('firefox'):
-        browser_driver = 'geckodriver'
-    elif shutil.which('chromium') or shutil.which('google-chrome'):
-        browser_driver = 'chromedriver'
+    if 'firefox' in args.browser:
+        try:
+            if shutil.which('firefox'):
+                browser_driver = 'geckodriver'
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+            sys.exit(1)
+        except:
+            print("Unknown error occurred.")
+            sys.exit(1)
+    elif 'chromium' in args.browser:
+        try:
+            if shutil.which('chromium') or shutil.which('google-chrome'):
+                browser_driver = 'chromedriver'
+    return browser_driver
 
+def check_for_driver(args, browser_driver):
+    try:
+        if shutil.which(browser_driver):
+            return True
+    except:
+        print(f"{browser_driver} not found.")
+        proceed = input("Would you like to install it now? [Y/n]: ").strip().lower()
+        if proceed in ['y', 'Y', 'Yes', 'yEs', 'yeS', 'YES', 'yes', 'OH YEAH BABY!', 'HURRY UP']:
+            package_manager = which_package_manager()
+            install_driver(args, package_manager, browser_driver)
+ 
+
+def install_driver(args, package_manager, browser_driver):
     # Check for browser_driver in PATH
     if not shutil.which(browser_driver):
         try:
             cmd = ['sudo', package_manager['name'], package_manager['install_command'], 'geckodriver', package_manager['yes_command']]
             subprocess.run(cmd)
             return True
-        except:
-            print("Install unsuccessful")
+        except as e:
+            print(f"Install unsuccessful: {e}")
             sys.exit(1)
     else:
         print("Already Installed")

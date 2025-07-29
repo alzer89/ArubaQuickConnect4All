@@ -112,6 +112,9 @@ def install_only(args, extracted_data):
         utils.prompt_to_install(args, extracted_data)
         exit(0)
 
+def prompt_for_dependencies(args):
+   os = detect_os(args) 
+
 def main():
     USER_AGENT = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"
     created_configs = []
@@ -127,6 +130,7 @@ def main():
     special_surprise(args)
     install_only(args, extracted_data)
     check_for_root(args)
+    prompt_for_dependencies(args)
     check_for_required_fields(args)
     #login.launch_browser(args, BROWSER) # This might actually be unnecessary
     url, cookies = login.perform_login_and_extract_gsid(args, USER_AGENT, BASE_URL, USERNAME, PASSWORD, TOTP_SECRET)
