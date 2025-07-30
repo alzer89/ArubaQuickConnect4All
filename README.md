@@ -42,8 +42,8 @@ Same for BSD support.  There's no reason it shouldn't work, we just haven't test
 
 ## Installation
 ```
-git clone https://github.com/alzer89/aqc4all
-cd aqc4all
+git clone https://github.com/alzer89/ArubaQuickConnect4All
+cd ArubaQuickConnect4All
 pip install .
 ```
 
