@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Aruba QuickConnect for All"
 authors = [{ name = "Walter Plinge", email = "walter@plinge.hair" }]
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 dependencies = [
     "selenium",
     "requests",
@@ -16,13 +16,38 @@ dependencies = [
     "configparser",
 ]
 
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "ruff>=0.15.1",
+]
+
 [project.scripts]
 aqc4all = "aqc4all.main:main"
 
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["uv_build>=0.10.4,<0.11.0"]
+build-backend = "uv_build"
 
-[tool.setuptools]
-package-dir = {"" = "src"}
+[tool.mypy]
+check_untyped_defs = true
+files = ["src"]
 
+[tool.ruff]
+line-length = 79
+
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+]
