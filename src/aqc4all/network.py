@@ -37,7 +37,7 @@ method=auto
 def generate_netplan_yaml(created_configs, extracted_data, cert_path="/tmp/aqc/client.pem", key_path="/tmp/aqc/private_key.pem"):
     con_uuid = uuid.uuid4()
     netplan_path = f"/tmp/aqc/{extracted_data['ssid']}.yaml"
-    with open(nm_path, "w") as f:
+    with open(netplan_path, "w") as f:
         f.write(f"""network:
   version: 2
   wifis:
@@ -97,7 +97,7 @@ def generate_systemd_networkd_config(created_configs, extracted_data, cert_path=
     with open(netdev_path, "w") as f:
         f.write("[NetDev]\nName=wlan0\nKind=wlan\n")
     with open(network_path, "w") as f:
-        f.write("""[Match]
+        f.write(f"""[Match]
 Name=wlan0
 
 [Network]
@@ -119,76 +119,153 @@ CAFile={extracted_data['root_cert']}
 def generate_netifrc_config(created_configs, extracted_data, cert_path="/tmp/aqc/client.pem", key_path="/tmp/aqc/private_key.pem"):
     net_path = "/tmp/aqc/conf.d_net"
     with open(net_path, "w") as f:
-        f.write("""modules_wlan0="wpa_supplicant"
+        f.write(f"""modules_wlan0="wpa_supplicant"
 config_wlan0="dhcp"
 wpa_supplicant_wlan0="-Dnl80211 -c/etc/wpa_supplicant/wpa_supplicant_{extracted_data['ssid']}.conf"
 """)
     print(f"[✓] netifrc config written to {net_path}")
     created_configs.append(f"{net_path}")
 
+import uuid
+import os
+import base64
+
+def _pem_to_base64_der(pem_path):
+    """Helper to convert a PEM certificate file into raw base64 DER for mobileconfig <data> tags."""
+    if not os.path.exists(pem_path):
+        return ""
+    with open(pem_path, "r") as f:
+        content = f.read()
+
+    lines = []
+    in_cert = False
+    for line in content.splitlines():
+        if "-----BEGIN" in line:
+            in_cert = True
+            continue
+        if "-----END" in line:
+            in_cert = False
+            continue
+        if in_cert:
+            lines.append(line.strip())
+    return "".join(lines)
+
 def generate_apple_mobileconfig(created_configs, extracted_data, cert_path="/tmp/aqc/client.pem", key_path="/tmp/aqc/private_key.pem"):
     ssid = extracted_data['ssid']
     mobileconfig_path = f"/tmp/aqc/{ssid}.mobileconfig"
-    payload_uuid = str(uuid.uuid4())
+
+    profile_uuid = str(uuid.uuid4())
+    wifi_uuid = str(uuid.uuid4())
+    ca_uuid = str(uuid.uuid4())
+
+    root_ca_path = extracted_data.get('root_cert', '/tmp/aqc/ca_root.pem')
+    ca_cert_base64 = _pem_to_base64_der(root_ca_path)
+
     with open(mobileconfig_path, "w") as f:
         f.write(f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-"http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>PayloadContent</key>
-  <array>
-    <dict>
-      <key>PayloadType</key>
-      <string>com.apple.wifi.managed</string>
-      <key>PayloadIdentifier</key>
-      <string>quickconnect.aruba.wifi.{ssid}</string>
-      <key>SSID_STR</key>
-      <string>{extracted_data['ssid']}</string>
-      <key>EncryptionType</key>
-      <string>WPA2</string>
-      <key>EAPClientConfiguration</key>
-      <dict>
-        <key>EAPFASTProvisionPAC</key>
-        <false/>
-        <key>AcceptEAPTypes</key>
-        <array><integer>13</integer></array>
-        <key>PayloadCertificateAnchorUUID</key>
-        <array><string>{payload_uuid}</string></array>
-      </dict>
-    </dict>
-  </array>
-  <key>PayloadType</key>
-  <string>Configuration</string>
-  <key>PayloadVersion</key>
-  <integer>1</integer>
+    <key>PayloadDisplayName</key>
+    <string>{ssid} Enterprise Wi-Fi</string>
+    <key>PayloadDescription</key>
+    <string>Secure EAP-TLS configuration profile for {ssid}</string>
+    <key>PayloadIdentifier</key>
+    <string>com.aruba.quickconnect.{ssid.lower().replace(' ', '')}</string>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadUUID</key>
+    <string>{profile_uuid}</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+    <key>PayloadRemovalDisallowed</key>
+    <false/>
+    <key>PayloadContent</key>
+    <array>
+        <!-- Root CA Certificate Payload for Server Trust Pinning -->
+        <dict>
+            <key>PayloadCertificateFileName</key>
+            <string>ca_root.cer</string>
+            <key>PayloadContent</key>
+            <data>{ca_cert_base64}</data>
+            <key>PayloadDisplayName</key>
+            <string>Root CA Certificate ({ssid})</string>
+            <key>PayloadIdentifier</key>
+            <string>com.aruba.quickconnect.ca.{ssid.lower().replace(' ', '')}</string>
+            <key>PayloadType</key>
+            <string>com.apple.security.root</string>
+            <key>PayloadUUID</key>
+            <string>{ca_uuid}</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+        </dict>
+
+        <!-- Managed Wi-Fi Payload -->
+        <dict>
+            <key>PayloadType</key>
+            <string>com.apple.wifi.managed</string>
+            <key>PayloadIdentifier</key>
+            <string>com.aruba.quickconnect.wifi.{ssid.lower().replace(' ', '')}</string>
+            <key>PayloadUUID</key>
+            <string>{wifi_uuid}</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+            <key>PayloadDisplayName</key>
+            <string>Wi-Fi: {ssid}</string>
+            <key>SSID_STR</key>
+            <string>{ssid}</string>
+            <key>EncryptionType</key>
+            <string>WPA2</string>
+            <key>AutoJoin</key>
+            <true/>
+            <key>EAPClientConfiguration</key>
+            <dict>
+                <key>AcceptEAPTypes</key>
+                <array>
+                    <integer>13</integer>
+                </array>
+                <key>PayloadCertificateAnchorUUID</key>
+                <array>
+                    <string>{ca_uuid}</string>
+                </array>
+                <key>UserName</key>
+                <string>{extracted_data['username']}</string>
+            </dict>
+        </dict>
+    </array>
 </dict>
 </plist>
 """)
     print(f"[✓] Apple mobileconfig written to {mobileconfig_path}")
-    created_configs.append(f"{mobileconfig_path}")
+    created_configs.append(mobileconfig_path)
 
 def generate_android_wifi_config(created_configs, extracted_data, cert_path="/tmp/aqc/client.pem", key_path="/tmp/aqc/private_key.pem"):
-    xml_path = f"/tmp/aqc/{extracted_data['ssid']}_android.xml"
+    xml_path = f"/tmp/aqc/{extracted_data['ssid']}_android_instructions.xml"
     with open(xml_path, "w") as f:
-        f.write("""<?xml version="1.0" encoding="UTF-8"?>
-<WifiConfig>
+        f.write(f"""<?xml version="1.0" encoding="UTF-8"?>
+<AndroidEnterpriseWiFiConfig>
+    <!--
+      NOTE: Android requires manual import of certificates due to OS security sandboxing.
+      Follow these parameters on your Android device:
+    -->
     <SSID>{extracted_data['ssid']}</SSID>
-    <SecurityType>WPA2</SecurityType>
-    <EAPMethod>TLS</EAPMethod>
+    <SecurityType>WPA2/WPA3-Enterprise</SecurityType>
+    <EAPMethod>TLS (Certificate)</EAPMethod>
+    <Phase2Authentication>None or MSCHAPv2</Phase2Authentication>
     <Identity>{extracted_data['username']}</Identity>
-    <ClientCertificate>{extracted_data['client_cert']}</ClientCertificate>
-    <PrivateKey>{extracted_data['priv_key']}</PrivateKey>
-    <CACertificate>{extracted_data['root_cert']}</CACertificate>
-</WifiConfig>
+    <CACertificateFile>ca_root.pem</CACertificateFile>
+    <ClientCertificateFile>client.pem</ClientCertificateFile>
+    <PrivateKeyFile>private_key.pem</PrivateKeyFile>
+    <Password>{extracted_data['password']}</Password>
+</AndroidEnterpriseWiFiConfig>
 """)
-    print(f"[✓] Android Wi-Fi config written to {xml_path}")
-    created_configs.append(f"{xml_path}")
+    print(f"[✓] Android configuration guide written to {xml_path}")
+    created_configs.append(xml_path)
 
 def generate_netctl_config(created_configs, extracted_data, cert_path="/tmp/aqc/client.pem", key_path="/tmp/aqc/private_key.pem"):
     netctl_path = f"/tmp/aqc/netctl_{extracted_data['ssid']}"
     with open(netctl_path, "w") as f:
-        f.write("""Description='{extracted_data['ssid']}'
+        f.write(f"""Description='{extracted_data['ssid']}'
 Interface=wlan0
 Connection=wireless
 Security=wpa-configsection
@@ -212,7 +289,7 @@ WPAConfigSection=(
 def generate_connman_settings(created_configs, extracted_data, cert_path="/tmp/aqc/client.pem", key_path="/tmp/aqc/private_key.pem"):
     connman_path = f"/tmp/aqc/{extracted_data['ssid']}.config"
     with open(connman_path, "w") as f:
-        f.write("""[service_{extracted_data['ssid']}]
+        f.write(f"""[service_{extracted_data['ssid']}]
 Type=wifi
 Name={extracted_data['ssid']}
 EAP=TLS
@@ -231,7 +308,7 @@ IPv6=off
 def generate_wicked_config(created_configs, extracted_data, cert_path="/tmp/aqc/client.pem", key_path="/tmp/aqc/private_key.pem"):
     wicked_path = f"/tmp/aqc/wicked_{extracted_data['ssid']}.xml"
     with open(wicked_path, "w") as f:
-        f.write("""<network>
+        f.write(f"""<network>
   <service name="{extracted_data['ssid']}">
     <interface name="wlan0">
       <wireless>
@@ -258,7 +335,7 @@ def generate_wicked_config(created_configs, extracted_data, cert_path="/tmp/aqc/
 def generate_iwd_settings(created_configs, extracted_data, cert_path="/tmp/aqc/client.pem", key_path="/tmp/aqc/private_key.pem"):
     iwd_path = f"/tmp/aqc/{extracted_data['ssid']}.8021x"
     with open(iwd_path, "w") as f:
-        f.write("""[Security]
+        f.write(f"""[Security]
 EAP-Method=TLS
 EAP-TLS-CACert={extracted_data['root_cert']}
 EAP-Identity={extracted_data['username']}

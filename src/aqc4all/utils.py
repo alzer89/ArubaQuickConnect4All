@@ -6,6 +6,43 @@ import getpass
 import subprocess
 import re
 import time
+import socket
+import http.server
+import threading
+import segno
+
+def serve_and_display_qr(created_configs, extracted_data):
+    # Find local IP address
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('10.255.255.255', 1))
+        local_ip = s.getsockname()[0]
+    except Exception:
+        local_ip = '127.0.0.1'
+    finally:
+        s.close()
+
+    port = 8080
+    target_dir = "/tmp/aqc_share"
+    os.makedirs(target_dir, exist_ok=True)
+
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def translate_path(self, path):
+            return os.path.join(target_dir, os.path.relpath(path, '/'))
+
+    server = http.server.HTTPServer(('0.0.0.0', port), Handler)
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+
+    url = f"http://{local_ip}:{port}/"
+    print(f"\n[+] Hosting connection files at: {url}")
+    print("[+] Scan this QR code with your Android phone to download your config:\n")
+
+    qr = segno.make(url)
+    qr.terminal(compact=True)
+
+    input("\nPress [Enter] when finished to shut down HTTP server...")
+    server.shutdown()
 
 def replace_string(filename, old_string, new_string):
     try:
@@ -49,17 +86,25 @@ def get_mac_address():
         return None
 
 def build_est_payload(mac, otp):
-    timestamp = int(time.time())
+    timestamp = int(time.time() * 1000)
+
     payload = {
         "device_type": "Ubuntu",
         "id": 1,
         "network_interfaces": [
-            {"interface_type": "Wireless", "mac_address": mac},
-            {"interface_type": "Wired", "mac_address": "CA:FE:CO:FF:EE:99"}  # Placeholder second MAC
+            {
+                "interface_type": "Wireless",
+                "mac_address": mac
+            },
+            {
+                "interface_type": "Wired", 
+                "mac_address": "CA:FE:CO:FF:EE:99"
+            }  # Placeholder second MAC
         ],
         "otp": otp,
         "timestamp": timestamp
     }
+
     return payload
 
 def display_wifi_client_info(extracted_data):
@@ -81,7 +126,7 @@ def display_wifi_client_info(extracted_data):
     print("ca cert: in /tmp/aqc/payload1.plist at bottom")
     print("==========================")
 
-def persist_files(created_configs, extracted_data, target_dir=os.path.expanduser(f"~/")):
+def persist_files(created_configs, extracted_data, target_dir=os.path.expanduser("~/")):
     print(f"[*] Copying files to persistent location: {target_dir}{extracted_data['ssid']}")
     target_dir = f"{target_dir}{extracted_data['ssid']}-files"
     os.makedirs(target_dir, exist_ok=True)
@@ -147,7 +192,7 @@ def prompt_to_install(args, extracted_data):
         print()
         print("This next part requires ROOT (sudo/doas) privileges")
         if 'passwordless' in command:
-            print("IMPORTANT: You can already execute passwordless root commands.  Think carefully!")
+            print("IMPORTANT: You can already execute passwordless root commands. Think carefully!")
         else:
             print("If you do not have this, you will not be able to install these configs")
         print("You can always, install these files manually, should you wish.")
@@ -158,7 +203,7 @@ def prompt_to_install(args, extracted_data):
                     sdbinary = detect_sudo_or_doas()
                     if sdbinary == 'sudo' or sdbinary == 'doas':
                         if os.geteuid() != 0:
-                            subprocess.run([ sdbinary, 'true' ])
+                            subprocess.run([sdbinary, 'true'])
                 except:
                     print("Authentication unsuccessful.")
                     print(f"Configs and keys have been saved at ~/{extracted_data['ssid']}-files")
@@ -197,44 +242,44 @@ def do_install(k, extracted_data, sdbinary):
 
 def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs, reload_command, sdbinary, append=False):
     try:
-        ssid =  extracted_data['ssid']
+        ssid = extracted_data['ssid']
         config_path = os.path.expanduser(f"~/{ssid}-files")
         newcert_path = '/etc/ssl/certs'
         newkey_path = '/etc/ssl/private'
         old_certs = ['ca_root.pem', 'client.pem']
-        old_keys = [ 'private_key.pem']
+        old_keys = ['private_key.pem']
         old_path = '/tmp/aqc'
 
         if extra_dirs:
             dirs = extra_dirs if isinstance(extra_dirs, list) else [extra_dirs]
-            for directory in extra_dirs:
-                subprocess.run([ sdbinary, 'mkdir', '-p', newcert_path, newkey_path, directory ], check=True)
+            for directory in dirs:
+                subprocess.run([sdbinary, 'mkdir', '-p', newcert_path, newkey_path, directory], check=True)
 
         for v in old_certs:
             oldoldpath = f'{old_path}/{v}'
             oldpath = f'{config_path}/{v}'
-            newpath =  f'{newcert_path}/{ssid}_{v}'
+            newpath = f'{newcert_path}/{ssid}_{v}'
             replace_string(f'{config_path}/{config_file}', oldoldpath, newpath)
-            subprocess.run([ sdbinary, 'cp', oldpath, newpath ])
-            subprocess.run([ sdbinary, 'chown', 'root:root', newpath ])
-            subprocess.run([ sdbinary, 'chmod', '600', newpath ])
+            subprocess.run([sdbinary, 'cp', oldpath, newpath])
+            subprocess.run([sdbinary, 'chown', 'root:root', newpath])
+            subprocess.run([sdbinary, 'chmod', '600', newpath])
 
         for v in old_keys:
             oldoldpath = f'{old_path}/{v}'
             oldpath = f'{config_path}/{v}'
-            newpath =  f'{newkey_path}/{ssid}_{v}'
+            newpath = f'{newkey_path}/{ssid}_{v}'
             replace_string(f'{config_path}/{config_file}', oldoldpath, newpath)
-            subprocess.run([ sdbinary, 'cp', oldpath, newpath ], check=True)
-            subprocess.run([ sdbinary, 'chown', 'root:root', newpath ], check=True)
-            subprocess.run([ sdbinary, 'chmod', '600', newpath ], check=True)
+            subprocess.run([sdbinary, 'cp', oldpath, newpath], check=True)
+            subprocess.run([sdbinary, 'chown', 'root:root', newpath], check=True)
+            subprocess.run([sdbinary, 'chmod', '600', newpath], check=True)
 
         if append:
-            subprocess.run([ sdbinary, 'sh', '-c', f'cat {config_path}/{config_file} >> {install_path}' ], check=True)
+            subprocess.run([sdbinary, 'sh', '-c', f'cat {config_path}/{config_file} >> {install_path}'], check=True)
         else:
-            subprocess.run([ sdbinary, 'cp', f'{config_path}/{config_file}', f'{install_path}' ], check=True)
-            subprocess.run([ sdbinary, 'chmod', '600', f'{install_path}' ], check=True)
- 
-        subprocess.run( [sdbinary] + reload_command.split(), check=True)
+            subprocess.run([sdbinary, 'cp', f'{config_path}/{config_file}', f'{install_path}'], check=True)
+            subprocess.run([sdbinary, 'chmod', '600', f'{install_path}'], check=True)
+
+        subprocess.run([sdbinary] + reload_command.split(), check=True)
 
     except PermissionError:
         print(f"Permission denied. Root privileges required.")
@@ -243,9 +288,8 @@ def install_certs_and_keys(extracted_data, config_file, install_path, extra_dirs
     except Exception as e:
         print(f"An error occurred: {e}")
 
-
 def install_networkmanager_config(extracted_data, sdbinary):
-    ssid =  extracted_data['ssid']
+    ssid = extracted_data['ssid']
     config_path = os.path.expanduser(f"~/{ssid}-files")
     config_file = f"{ssid}.nmconnection"
     install_path = f"/etc/NetworkManager/system-connections/{config_file}"
@@ -259,7 +303,7 @@ def install_networkmanager_config(extracted_data, sdbinary):
         print(f"[!] Failed to install NetworkManager config: {e}")
 
 def install_wpa_supplicant_config(extracted_data, sdbinary):
-    ssid =  extracted_data['ssid']
+    ssid = extracted_data['ssid']
     install_path = "/etc/wpa_supplicant/wpa_supplicant.conf"
     config_path = os.path.expanduser(f"~/{ssid}-files")
     config_file = f"wpa_supplicant_{ssid}.conf"
@@ -273,8 +317,8 @@ def install_wpa_supplicant_config(extracted_data, sdbinary):
         print(f"[!] Failed to install wpa_supplicant config: {e}")
 
 def install_netctl_config(extracted_data, sdbinary):
-    ssid =  extracted_data['ssid']
-    install_path = "/etc/netctl/{ssid}"
+    ssid = extracted_data['ssid']
+    install_path = f"/etc/netctl/{ssid}"
     config_path = os.path.expanduser(f"~/{ssid}-files")
     config_file = f"netctl_{ssid}"
     reload_command = f"netctl start {ssid}"
@@ -287,7 +331,7 @@ def install_netctl_config(extracted_data, sdbinary):
         print(f"[!] Failed to install netctl config: {e}")
 
 def install_connman_config(extracted_data, sdbinary):
-    ssid =  extracted_data['ssid']
+    ssid = extracted_data['ssid']
     config_path = os.path.expanduser(f"~/{ssid}-files")
     config_file = f"{ssid}.config"
     reload_command = "systemctl restart connman"
@@ -300,7 +344,7 @@ def install_connman_config(extracted_data, sdbinary):
         print(f"[!] Failed to install ConnMan config: {e}")
 
 def install_wicked_config(extracted_data, sdbinary):
-    ssid =  extracted_data['ssid']
+    ssid = extracted_data['ssid']
     config_path = os.path.expanduser(f"~/{ssid}-files")
     config_file = f"wicked_{ssid}.xml"
     reload_command = "systemctl restart wicked"
@@ -314,7 +358,7 @@ def install_wicked_config(extracted_data, sdbinary):
         print(f"[!] Failed to install Wicked config: {e}")
 
 def install_iwd_config(extracted_data, sdbinary):
-    ssid =  extracted_data['ssid']
+    ssid = extracted_data['ssid']
     config_path = os.path.expanduser(f"~/{ssid}-files")
     config_file = f"{ssid}.8021x"
     reload_command = "systemctl restart iwd"
@@ -332,4 +376,3 @@ def cleanup_tmp(args):
         shutil.rmtree("/tmp/aqc", ignore_errors=True)
     else:
         print("[!] --noclean specified, leaving /tmp/aqc intact.")
-

@@ -6,7 +6,8 @@ import sys
 import textwrap
 import re
 import os
-
+import time
+from aqc4all.certs import generate_p12_bundle
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -43,6 +44,8 @@ def parse_args():
     parser.add_argument('--i-work-in-it', action="store_true", help="Special surprise for arrogant IT workers")
     parser.add_argument('--yes-i-know-i-am-root-and-know-what-i-am-doing', action="store_true", help="Only use this if you know what you are doing...")
     parser.add_argument('--welcome-only', action="store_true", help="Show the absolutely glroious logo that I took 2 hours to make MANUALLY in vim")
+    parser.add_argument("--renew", action="store_true", help="Renew existing certificates using your saved private key and credentials")
+    parser.add_argument("--qr", action="store_true", help="Host generated files locally and display a terminal QR code for mobile devices")
     return parser.parse_args()
 
 
@@ -50,18 +53,18 @@ def parse_args():
 def check_for_root(args):
     if os.geteuid() == 0:
         if not args.yes_i_know_i_am_root_and_i_know_what_i_am_doing:
-            print("This opens a WEB BROWSER.  And you were about to do it as root.\n\nThis is generally NOT a good idea...\n\n")
-            print("Exiting...")
+            print("[!] This opens a WEB BROWSER.  And you were about to do it as root.\n\nThis is generally NOT a good idea...\n\n")
+            print("[*] Exiting...")
             sys.exit(1)
         else:
-            print("You have added '--yes-i-know-i-am-root-and-i-know-what-i-am-doing'.\n\nYou brave, brave soul...\n\n")
-            print("Are you 100% sure you want to proceed?")
+            print("[*] You have added '--yes-i-know-i-am-root-and-i-know-what-i-am-doing'.\n\nYou brave, brave soul...\n\n")
+            print("[*] Are you 100% sure you want to proceed?")
             proceed = input("Continue? [y/N]: ").strip().lower()
             if proceed in ['y', 'Y', 'Yes', 'yEs', 'yeS', 'YES', 'yes', 'YES!', 'YOLO', 'Skibidi Rizz']:
                 return 0
             else:
                 sys.exit(1)
- 
+
 def check_for_required_fields(args):
     import getpass
     global USERNAME, PASSWORD, BASE_URL, TOTP_SECRET, BROWSER
@@ -86,7 +89,7 @@ def check_for_required_fields(args):
         if (re.match(regex, BASE_URL) is not None) == True:
             break
         else:
-            print("Invalid URL!")
+            print("[!] Invalid URL!")
             BASE_URL = None
     TOTP_SECRET = args.totp_secret
     if not TOTP_SECRET:
@@ -207,6 +210,11 @@ def main():
     welcome_message(args)
     install_only(args, extracted_data)
     check_for_root(args)
+
+    if args.renew:
+        print("[*] Renewal mode requested.")
+        certs.load_existing_private_key(extracted_data)
+
     browser_driver = os_params.check_for_dependencies(args)
     os_params.check_for_driver(args, browser_driver)
     check_for_required_fields(args)
@@ -219,14 +227,22 @@ def main():
     if not mac_wifi:
         mac_wifi = "13:37:BE:EF:DE:AD"
     certs.post_device_metadata(config_values, BASE_URL, USER_AGENT, mac_wifi)
+    time.sleep(1)
     certs.fetch_and_decode_cacerts(config_values, BASE_URL, USER_AGENT)
+    time.sleep(1)
     certs.extract_credentials_from_plist(extracted_data)
     certs.extract_certs_from_plist(extracted_data)
     certs.fetch_and_parse_csrattrs(extracted_data, config_values, BASE_URL, USER_AGENT)
+    time.sleep(1)
     certs.generate_private_key_if_missing(extracted_data)
     certs.generate_csr_from_key()
-    certs.post_csr_request(config_values, BASE_URL, USER_AGENT, False)
+
+    certs.post_csr_request(config_values, BASE_URL, USER_AGENT, reenroll=args.renew)
     certs.process_csr_response(extracted_data)
+
+    p12_file = generate_p12_bundle(extracted_data, output_dir="/tmp/aqc")
+    if p12_file:
+        created_configs.append(p12_file)
 
     utils.display_wifi_client_info(extracted_data)
 
@@ -242,9 +258,31 @@ def main():
     network.generate_iwd_settings(created_configs, extracted_data)
 
     utils.persist_files(created_configs, extracted_data)
+    if args.qr:
+        print("""
+[*] We will spin up your server regardless of whether you 
+    answer yes or no to the next prompt. Don't worry...
+    """)
     utils.prompt_to_install(args, extracted_data)
-    utils.cleanup_tmp(args)
 
+    if args.qr:
+        import shutil
+        from .web_server import launch_secure_qr_server
+
+        share_dir = "/tmp/aqc_share"
+        os.makedirs(share_dir, exist_ok=True)
+
+        for cfg in created_configs:
+            if os.path.exists(cfg):
+                shutil.copy(cfg, share_dir)
+        if extracted_data.get("client_cert") and os.path.exists(extracted_data["client_cert"]):
+            shutil.copy(extracted_data["client_cert"], share_dir)
+        if extracted_data.get("root_cert") and os.path.exists(extracted_data["root_cert"]):
+            shutil.copy(extracted_data["root_cert"], share_dir)
+
+        launch_secure_qr_server(share_dir, extracted_data)
+
+    utils.cleanup_tmp(args)
 
 if __name__ == "__main__":
     main()
