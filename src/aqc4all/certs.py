@@ -9,10 +9,13 @@ import requests
 import sys
 from OpenSSL import crypto
 import textwrap
-#from pyasn1.codec.der.decoder import decode as decoder
 from pyasn1.codec.der.decoder import decode as asn1_decode
+from pyasn1.type import univ
 
-def post_device_metadata(config_values, BASE_URL, USER_AGENT, mac_wifi, mac_eth="CA:FE:CO:FF:EE:99"):
+key_bits = 4096
+
+def post_device_metadata(config_values, BASE_URL, USER_AGENT, mac_wifi,
+                         mac_eth="CA:FE:CO:FF:EE:99"):
     print("[*] Creating and posting device metadata payload...")
 
     otp = config_values.get("root", {}).get("global.otp")
@@ -22,13 +25,21 @@ def post_device_metadata(config_values, BASE_URL, USER_AGENT, mac_wifi, mac_eth=
         print("[!] Missing OTP or EST server URL in config.")
         return None
 
-    timestamp = int(time.time())
+    # The successful curl request uses milliseconds.
+    timestamp = int(time.time() * 1000)
+
     payload = {
         "device_type": "Ubuntu",
         "id": 1,
         "network_interfaces": [
-            {"interface_type": "Wireless", "mac_address": mac_wifi},
-            {"interface_type": "Wired", "mac_address": mac_eth}
+            {
+                "interface_type": "Wireless",
+                "mac_address": mac_wifi
+            },
+            {
+                "interface_type": "Wired",
+                "mac_address": mac_eth
+            }
         ],
         "otp": otp,
         "timestamp": timestamp
@@ -38,32 +49,58 @@ def post_device_metadata(config_values, BASE_URL, USER_AGENT, mac_wifi, mac_eth=
     response_path = "/tmp/aqc/payload1.plist"
 
     os.makedirs("/tmp/aqc", exist_ok=True)
-    with open(payload_path, "w") as f:
-        json.dump(payload, f, indent=2)
-    print(f"[✓] Payload written to {payload_path}")
 
-    session = requests.Session()
-    session.headers.update({
-        "User-Agent": USER_AGENT,
-        "Content-Type": "application/json"
-    })
+    payload_json = json.dumps(payload, indent=4)
+
+    with open(payload_path, "w") as f:
+        f.write(payload_json)
+
+    url = f"{BASE_URL}onboard/mdps_qc_enroll.php"
+
+    cmd = [
+        "curl",
+        "-s",
+        "-S",
+        "-k",
+        "--compressed",
+        "-X", "POST",
+        url,
+
+        "-H", f"Content-Type: application/json",
+        "-H", "Connection: Keep-Alive",
+        "-H", "Accept-Language: en,*",
+        "-H", f"User-Agent: {USER_AGENT}",
+        "-H", "Host: onboard-portal.it.unsw.edu.au",
+
+        "-d", payload_json,
+        "-o", response_path,
+    ]
+
+    print("[i] POST:", url)
+    print("[i] Payload:", payload_json)
 
     try:
-        response = session.post(
-            url=f"{BASE_URL}/onboard/mdps_qc_enroll.php",
-            json=payload,
-            timeout=15
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True
         )
 
-        with open(response_path, "wb") as f:
-            f.write(response.content)
+        if result.stderr:
+            print("[curl]", result.stderr.strip())
 
-        print(f"[✓] Response saved to {response_path}")
-        return response
+        if os.path.exists(response_path) and os.path.getsize(response_path) > 0:
+            print(f"[✓] Response saved to {response_path}")
+            return True
 
-    except requests.RequestException as e:
-        print(f"[!] Request to EST metadata endpoint failed: {e}")
+        print("[!] Server returned an empty response.")
         return None
+
+    except subprocess.CalledProcessError as e:
+        print(f"[!] Curl request to POST device metadata endpoint failed: {e.stderr}")
+        return None
+
 
 def fetch_and_decode_cacerts(config_values, BASE_URL, USER_AGENT):
     print("[*] Fetching CA certificates from EST server...")
@@ -75,21 +112,23 @@ def fetch_and_decode_cacerts(config_values, BASE_URL, USER_AGENT):
         print("[!] Missing EST URL or OTP.")
         return False
 
-    cacerts_url = f"{BASE_URL}/.well-known/est/qc:{otp}/cacerts"
+    cacerts_url = f"{BASE_URL}.well-known/est/qc:{otp}/cacerts"
     base64_path = "/tmp/aqc/ca_root.b64"
     binary_path = "/tmp/aqc/ca_root.bin"
     log_path = "/tmp/aqc/curl_cacerts.log"
 
-    session = requests.Session()
-    session.headers.update({"User-Agent": USER_AGENT})
+    cmd = [
+        "curl", "--http1.1", "-s", "-S", "-k", "-X", "GET", cacerts_url,
+        "-H", f"User-Agent: {USER_AGENT}",
+        "-o", base64_path
+    ]
 
     try:
-        response = session.get(cacerts_url, timeout=10)
-        response.raise_for_status()
-        with open(base64_path, "wb") as f:
-            f.write(response.content)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        if not os.path.exists(base64_path) or os.path.getsize(base64_path) == 0:
+            raise Exception("Empty response from server")
         print(f"[✓] CA certs base64 saved to {base64_path}")
-    except requests.RequestException as e:
+    except Exception as e:
         with open(log_path, "w") as log:
             log.write(str(e))
         print(f"[!] ERROR: fetching cacerts failed. Details in {log_path}")
@@ -106,23 +145,130 @@ def fetch_and_decode_cacerts(config_values, BASE_URL, USER_AGENT):
         print("[!] Failed to decode base64 CA certs.")
         return False
 
-def convert_pkcs7_der_to_pem_pythonic(der_path="/tmp/aqc/ca_root.bin", pem_path="/tmp/aqc/ca_root.pem"):
-    print("[*] Converting ca_root.bin to PEM using cryptography...")
-    try:
-        with open(der_path, "rb") as f:
-            der_data = f.read()
+def fetch_and_parse_csrattrs(extracted_data, config_values, BASE_URL, USER_AGENT):
+    print("[*] Fetching CSR attributes from EST server...")
 
-        certs = load_der_pkcs7_certificates(der_data)
+    est_url = config_values.get("root", {}).get("global.mdps_url")
+    otp = config_values.get("root", {}).get("global.otp")
 
-        with open(pem_path, "wb") as f:
-            for cert in certs:
-                f.write(cert.public_bytes(Encoding.PEM))
-
-        print(f"[✓] Certificates written to {pem_path}")
-        return True
-    except Exception as e:
-        print(f"[!] Failed to convert PKCS7 DER to PEM: {e}")
+    if not est_url or not otp:
+        print("[!] Missing EST URL or OTP for CSR attributes.")
         return False
+
+    csrattr_url = f"{BASE_URL}.well-known/est/qc:{otp}/csrattrs"
+    b64_path = "/tmp/aqc/ca_csrattr.b64"
+    bin_path = "/tmp/aqc/ca_csrattr.bin"
+    txt_path = "/tmp/aqc/ca_csrattr.txt"
+
+    cmd = [
+        "curl", "--http1.1", "-s", "-S", "-k", "-X", "GET", csrattr_url,
+        "-H", f"User-Agent: {USER_AGENT}",
+        "-o", b64_path
+    ]
+
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
+        if not os.path.exists(b64_path) or os.path.getsize(b64_path) == 0:
+            print("[!] ERROR: fetching csrattrs returned empty response.")
+            return False
+        print(f"[✓] CSR attributes base64 saved to {b64_path}")
+    except subprocess.CalledProcessError as e:
+        print(f"[!] ERROR: fetching csrattrs failed: {e.stderr}")
+        return False
+
+    try:
+        with open(b64_path, "rb") as f:
+            decoded = base64.b64decode(f.read())
+        with open(bin_path, "wb") as f:
+            f.write(decoded)
+        print(f"[✓] CSR attributes binary saved to {bin_path}")
+    except Exception as e:
+        print(f"[!] Failed to decode CSR attributes: {e}")
+        return False
+    return parse_csrattrs_der(extracted_data, bin_path, txt_path)
+
+def post_csr_request(config_values, BASE_URL, USER_AGENT, reenroll=False):
+    print("[*] Posting CSR to EST server using curl...")
+
+    otp = config_values.get("root", {}).get("global.otp")
+    est_url = config_values.get("root", {}).get("global.mdps_url")
+
+    if not est_url or not otp:
+        print("[!] Missing EST URL or OTP for CSR post.")
+        return False
+
+    endpoint = "simplereenroll" if reenroll else "simpleenroll"
+    url = f"{BASE_URL}.well-known/est/qc:{otp}/{endpoint}"
+
+    csr_file = "/tmp/aqc/csr_mydevice_fix.csr"
+    reply_file = "/tmp/aqc/csr_post_reply.b64"
+
+    if not os.path.exists(csr_file):
+        print(f"[!] Cleaned CSR file not found at {csr_file}")
+        return False
+
+    cmd = [
+        "curl",
+        "--http1.1",
+        "-s",
+        "-S",
+        "-k",
+        "--compressed",
+        "-X", "POST",
+        url,
+
+        "-H", "Content-Type: text/plain",
+        "-H", "Connection: Keep-Alive",
+        "-H", "Accept-Language: en,*",
+        "-H", f"User-Agent: {USER_AGENT}",
+        "-H", "Host: onboard-portal.it.unsw.edu.au",
+
+        "--data-binary", f"@{csr_file}",
+        "-o", reply_file,
+    ]
+
+    print("[i] POST:", url)
+    print("[i] CSR:", csr_file)
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        if result.stderr:
+            print("[curl]", result.stderr.strip())
+
+        if os.path.exists(reply_file) and os.path.getsize(reply_file) > 0:
+            print(f"[✓] CSR reply saved to {reply_file}")
+            return True
+
+        print("[!] Server returned an empty response for CSR enrollment.")
+        return False
+
+    except subprocess.CalledProcessError as e:
+        print(f"[!] Failed to POST CSR via curl: {e.stderr}")
+        return False
+
+def load_existing_private_key(extracted_data, key_path="/tmp/aqc/private_key.pem"):
+    print("[*] Checking for existing private key for renewal...")
+    os.makedirs(os.path.expanduser("~/.config/aqc4all"), exist_ok=True)
+    persist_path = os.path.expanduser("~/.config/aqc4all/private_key.pem")
+
+    if os.path.exists(persist_path) and not os.path.exists(key_path):
+        os.makedirs(os.path.dirname(key_path), exist_ok=True)
+        with open(persist_path, "rb") as src, open(key_path, "wb") as dst:
+            dst.write(src.read())
+
+    if os.path.exists(key_path):
+        print(f"[✓] Using existing private key found at {key_path}")
+        extracted_data['priv_key'] = key_path
+        return True
+
+    print("[!] No existing private key found. A new one will be generated.")
+    return False
 
 def extract_credentials_from_plist(extracted_data, plist_path="/tmp/aqc/payload1.plist"):
     print("[*] Extracting credentials and SSID from payload1.plist...")
@@ -131,13 +277,11 @@ def extract_credentials_from_plist(extracted_data, plist_path="/tmp/aqc/payload1
             plist_data = plistlib.load(f)
 
         for item in plist_data.get("PayloadContent", []):
-            # Extract EAP credentials
             eap_config = item.get("EAPClientConfiguration")
             if eap_config:
                 extracted_data["username"] = eap_config.get("UserName")
                 extracted_data["password"] = eap_config.get("UserPassword")
 
-            # Extract SSID
             if item.get("PayloadType") == "com.apple.wifi.managed":
                 ssid = item.get("SSID_STR")
                 if ssid:
@@ -199,9 +343,8 @@ def parse_csrattrs_der(extracted_data, bin_path="/tmp/aqc/ca_csrattr.bin", txt_p
         with open(bin_path, "rb") as f:
             data = f.read()
 
-        #decoded, _ = decoder.decode(data)
         decoded, _ = asn1_decode(data)
-        
+
         def walk(asn1_obj, indent=0):
             lines = []
             if isinstance(asn1_obj, univ.SequenceOf) or isinstance(asn1_obj, univ.SetOf):
@@ -223,52 +366,12 @@ def parse_csrattrs_der(extracted_data, bin_path="/tmp/aqc/ca_csrattr.bin", txt_p
         print(f"[!] Failed to parse CSR attributes ASN.1: {e}")
         return False
 
-def fetch_and_parse_csrattrs(extracted_data, config_values, BASE_URL, USER_AGENT):
-    print("[*] Fetching CSR attributes from EST server...")
-
-    est_url = config_values.get("root", {}).get("global.mdps_url")
-    otp = config_values.get("root", {}).get("global.otp")
-
-    if not est_url or not otp:
-        print("[!] Missing EST URL or OTP for CSR attributes.")
-        return False
-
-    csrattr_url = f"{BASE_URL}/.well-known/est/qc:{otp}/csrattrs"
-    b64_path = "/tmp/aqc/ca_csrattr.b64"
-    bin_path = "/tmp/aqc/ca_csrattr.bin"
-    txt_path = "/tmp/aqc/ca_csrattr.txt"
-
-    session = requests.Session()
-    session.headers.update({"User-Agent": USER_AGENT})
-
-    try:
-        response = session.get(csrattr_url, timeout=10)
-        response.raise_for_status()
-        with open(b64_path, "wb") as f:
-            f.write(response.content)
-        print(f"[✓] CSR attributes base64 saved to {b64_path}")
-    except requests.RequestException as e:
-        print(f"[!] ERROR: fetching csrattrs failed: {e}")
-        return False
-
-    try:
-        with open(b64_path, "rb") as f:
-            decoded = base64.b64decode(f.read())
-        with open(bin_path, "wb") as f:
-            f.write(decoded)
-        print(f"[✓] CSR attributes binary saved to {bin_path}")
-    except Exception as e:
-        print(f"[!] Failed to decode CSR attributes: {e}")
-        return False
-    return parse_csrattrs_der(extracted_data, bin_path, txt_path)
-
 def generate_private_key_if_missing(extracted_data, key_path="/tmp/aqc/private_key.pem", debug=False):
-
     if not os.path.exists(key_path):
         print("[*] Creating private key...")
         try:
             key = crypto.PKey()
-            key.generate_key(crypto.TYPE_RSA, 4096)
+            key.generate_key(crypto.TYPE_RSA, key_bits)
             with open(key_path, "wb") as f:
                 f.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
             print(f"[✓] Private key saved to {key_path}")
@@ -301,27 +404,13 @@ def generate_csr_from_key():
     os.makedirs("/tmp/aqc", exist_ok=True)
 
     if not os.path.exists(key_path):
-        print("[*] Generating new RSA private key (4096-bit)...")
-        private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=4096
-        )
+        print("[*] Private key missing. Please generate it first.")
+        return False
 
-        with open(key_path, "wb") as f:
-            f.write(private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.TraditionalOpenSSL,
-                encryption_algorithm=serialization.NoEncryption()
-            ))
-        print(f"[✓] Private key saved to {key_path}")
-    else:
-        print("[*] Private key already exists")
-
-    # Use OpenSSL to generate CSR from key and config
     csr_config_path = "/tmp/aqc/csr_config.cnf"
     with open(csr_config_path, "w") as f:
-        f.write("""[ req ]
-default_bits       = 4096
+        f.write(f"""[ req ]
+default_bits       = {key_bits}
 distinguished_name = req_distinguished_name
 prompt             = no
 
@@ -342,6 +431,7 @@ CN = Request Linux Certificate
     except subprocess.CalledProcessError as e:
         print(f"[!] OpenSSL CSR generation failed: {e}")
         return False
+
     try:
         with open(csr_path, "r") as f:
             lines = f.readlines()
@@ -352,40 +442,6 @@ CN = Request Linux Certificate
         return True
     except Exception as e:
         print(f"[!] Failed to clean CSR: {e}")
-        return False
-
-def post_csr_request(config_values, BASE_URL, USER_AGENT, reenroll=False):
-    print("[*] Posting CSR to EST server...")
-    otp = config_values.get("root", {}).get("global.otp")
-    est_url = config_values.get("root", {}).get("global.mdps_url")
-
-    if not est_url or not otp:
-        print("[!] Missing EST URL or OTP for CSR post.")
-        return False
-
-    endpoint = "simplereenroll" if reenroll else "simpleenroll"
-    url = f"{BASE_URL}/.well-known/est/qc:{otp}/{endpoint}"
-
-    csr_file = "/tmp/aqc/csr_mydevice_fix.csr"
-    reply_file = "/tmp/aqc/csr_post_reply.b64"
-
-    try:
-        with open(csr_file, "rb") as f:
-            csr_data = f.read()
-
-        response = requests.post(
-            url,
-            headers={"Content-Type": "application/csrattrs", "User-Agent": USER_AGENT},
-            data=csr_data
-        )
-        response.raise_for_status()
-
-        with open(reply_file, "wb") as f:
-            f.write(response.content)
-        print(f"[✓] CSR reply saved to {reply_file}")
-        return True
-    except requests.RequestException as e:
-        print(f"[!] Failed to POST CSR: {e}")
         return False
 
 def process_csr_response(extracted_data):
@@ -419,3 +475,36 @@ def process_csr_response(extracted_data):
         print(f"[!] Failed to process CSR response: {e}")
         return False
 
+def generate_p12_bundle(extracted_data, output_dir="/tmp/aqc"):
+    """
+    Bundles client.pem and private_key.pem into a .p12 (PKCS#12) file
+    required by Android and manual mobile imports.
+    """
+    ssid = extracted_data.get('ssid', 'eduroam')
+    p12_path = os.path.join(output_dir, f"{ssid}_client.p12")
+    client_cert = os.path.join(output_dir, "client.pem")
+    private_key = os.path.join(output_dir, "private_key.pem")
+    ca_root = os.path.join(output_dir, "ca_root.pem")
+    password = extracted_data.get('password', 'changeme')
+
+    if not os.path.exists(client_cert) or not os.path.exists(private_key):
+        print("[!] Client cert or private key missing, cannot generate .p12 bundle.")
+        return None
+
+    # OpenSSL command to bundle cert, key, and optional CA chain into a .p12 file
+    cmd = [
+        "openssl", "pkcs12", "-export",
+        "-out", p12_path,
+        "-inkey", private_key,
+        "-in", client_cert,
+        "-certfile", ca_root,
+        "-password", f"pass:{password}"
+    ]
+
+    try:
+        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        print(f"[✓] Android PKCS#12 bundle written to {p12_path}")
+        return p12_path
+    except subprocess.CalledProcessError as e:
+        print(f"[!] Failed to generate .p12 file: {e.stderr.decode().strip()}")
+        return None

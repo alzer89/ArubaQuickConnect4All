@@ -11,16 +11,24 @@ from selenium.webdriver.firefox.service import Service as FirefoxService
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.common.exceptions import WebDriverException
-from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import time
 import requests
 import shutil
 import pyotp
 
 def launch_browser(args, USER_AGENT):
-    browser_choice = args.browser.lower() if args.browser else "chromium"
+    browser_arg = getattr(args, 'browser', None)
+    if browser_arg:
+        browser_choice = browser_arg.lower()
+    else:
+        if shutil.which("geckodriver") or shutil.which("firefox") or shutil.which("firefox-esr") or shutil.which("librewolf"):
+            browser_choice = "firefox"
+        else:
+            browser_choice = "chromium"
 
-    if browser_choice == "firefox":
+    if browser_choice in ["firefox", "firefox-esr", "librewolf", "tor-browser"]:
         # Fix for Firefox Snap profile access issue
         os.environ["TMPDIR"] = os.path.expanduser("~/tmp")
         os.makedirs(os.environ["TMPDIR"], exist_ok=True)
@@ -46,18 +54,18 @@ def launch_browser(args, USER_AGENT):
 
         # Firefox on Arch and Nix most certainly doesn't like pretending it's Firefox on Ubuntu...
         options.profile = profile
-        options.add_argument(f"--profile-root={profile_root}") # added profile-root
+        options.add_argument(f"--profile-root={profile_root}")
 
         service = FirefoxService(executable_path=geckodriver_path)
         return webdriver.Firefox(service=service, options=options)
 
-    elif browser_choice == "chromium":
+    elif browser_choice in ["chromium", "chrome", "google-chrome", "brave", "edge", "vivaldi", "opera"]:
         chromedriver_path = shutil.which("chromedriver")
         if chromedriver_path is None:
             raise FileNotFoundError("chromedriver not found in PATH")
 
         options = ChromeOptions()
-        print("[+] Running with Chromium browser")
+        print("[+] Running with Chromium/Chrome-based browser")
         options.add_argument("--disable-save-password-bubble")
         prefs = {"credentials_enable_service": False, "profile.password_manager_enabled": False}
         options.add_experimental_option("prefs", prefs)
@@ -70,7 +78,6 @@ def launch_browser(args, USER_AGENT):
     else:
         raise ValueError("Unsupported browser: use 'chromium' or 'firefox'")
 
-
 def perform_login_and_extract_gsid(args, USER_AGENT, BASE_URL, USERNAME, PASSWORD, TOTP_SECRET):
     session = requests.Session()
     session.headers.update({"User-Agent": USER_AGENT})
@@ -82,11 +89,31 @@ def perform_login_and_extract_gsid(args, USER_AGENT, BASE_URL, USERNAME, PASSWOR
         driver.get(BASE_URL)
         print("[*] Current URL after navigation:", driver.current_url)
 
-        print("[>] Microsoft login page loaded")
+        time.sleep(3)
+        if "provisioning.php" in driver.current_url or "onboard" in driver.current_url:
+            print("[*] Looking for Aruba Onboard start/join button...")
+            try:
+                start_buttons = driver.find_elements(By.XPATH, "//button | //a | //input[@type='submit']")
+                for btn in start_buttons:
+                    text = btn.text.lower() if btn.text else ""
+                    val = btn.get_attribute("value").lower() if btn.get_attribute("value") else ""
+                    if any(keyword in text or keyword in val for keyword in ["start", "join", "download", "configure", "continue", "agree"]):
+                        print(f"[>] Clicking landing page button: {btn.text or val}")
+                        btn.click()
+                        break
+            except Exception as e:
+                print(f"[*] No direct landing page button auto-clicked: {e}")
 
-        time.sleep(2)
-        if USERNAME:
+        print("[*] Waiting for Microsoft login page...")
+        wait = WebDriverWait(driver, 15)
+        try:
+            username_input = wait.until(EC.presence_of_element_located((By.NAME, "loginfmt")))
+            print("[>] Microsoft login page loaded")
+        except Exception:
+            time.sleep(3)
             username_input = driver.find_element(By.NAME, "loginfmt")
+
+        if USERNAME:
             username_input.send_keys(USERNAME)
             print("[>] Entered username")
             driver.find_element(By.ID, "idSIButton9").click()
@@ -119,16 +146,14 @@ def perform_login_and_extract_gsid(args, USER_AGENT, BASE_URL, USERNAME, PASSWOR
                 if "mdps_qc_profile.php?GSID=" in driver.page_source:
                     print("[✓] TOTP accepted, continuing...")
                     break
-                #time.sleep(2)
+                time.sleep(2)
             else:
                 print("[!] Timed out waiting for TOTP submission.")
 
-        #time.sleep(2)
         if driver.find_elements(By.ID, "idSIButton9"):
             driver.find_element(By.ID, "idSIButton9").click()
             print("[>] Clicked 'Stay signed in'")
 
-        #time.sleep(3)
         print("[*] Waiting for portal return URL with onboard path...")
         start_time = time.time()
         gsid = None
@@ -140,10 +165,11 @@ def perform_login_and_extract_gsid(args, USER_AGENT, BASE_URL, USERNAME, PASSWOR
             if match:
                 gsid = match.group(1)
                 print("[✓] Found GSID:", gsid)
-                download_url = f"{BASE_URL}/onboard/mdps_qc_profile.php?GSID={gsid}"
+                download_url = f"{BASE_URL.rstrip('/')}/onboard/mdps_qc_profile.php?GSID={gsid}"
                 print("[✓] Direct download URL:", download_url)
                 break
-            #time.sleep(2)
+            time.sleep(2)
+
         if not gsid:
             print("[!] GSID not found within timeout.")
             download_url = None
@@ -155,9 +181,7 @@ def perform_login_and_extract_gsid(args, USER_AGENT, BASE_URL, USERNAME, PASSWOR
     driver.quit()
     return download_url, cookies
 
-
 def download_script(download_url, cookies, USER_AGENT, output_path="/tmp/ArubaQuickConnect.sh"):
-    import requests
     if not download_url:
         print("[!] No download URL provided, skipping download.")
         return
@@ -201,4 +225,3 @@ def extract_embedded_tar(output_path="/tmp/ArubaQuickConnect.sh"):
 
     shutil.unpack_archive(temp_tar_path, "/tmp/aqc")
     print("[✓] Extracted to /tmp/aqc")
-
