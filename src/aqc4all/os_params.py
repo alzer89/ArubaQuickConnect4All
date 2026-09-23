@@ -208,14 +208,18 @@ def install_driver(browser_driver, package_manager):
             'apt': 'geckodriver',
             'pacman': 'geckodriver',
             'dnf': 'geckodriver',
-            'zypper': 'geckodriver'
+            'zypper': 'geckodriver',
+            'nix': 'nixpkgs#geckodriver',
+            'nix-env': 'nixpkgs.geckodriver'
         },
         'chromedriver': {
             'emerge': 'www-client/chromium',
             'apt': 'chromium-chromedriver',
             'pacman': 'chromium',
             'dnf': 'chromium-chromedriver',
-            'zypper': 'chromedriver'
+            'zypper': 'chromedriver',
+            'nix': 'nixpkgs#chromium',
+            'nix-env': 'nixpkgs.chromium'
         }
     }
 
