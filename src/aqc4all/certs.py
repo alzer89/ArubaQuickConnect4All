@@ -475,13 +475,17 @@ def process_csr_response(extracted_data):
         print(f"[!] Failed to process CSR response: {e}")
         return False
 
-def generate_p12_bundle(extracted_data, output_dir="/tmp/aqc"):
+def generate_p12_bundle(extracted_data, output_dir="/tmp/aqc", legacy=False):
     """
-    Bundles client.pem and private_key.pem into a .p12 (PKCS#12) file
-    required by Android and manual mobile imports.
+    Bundles client.pem and private_key.pem into a .p12 (PKCS#12) file.
+    Use legacy=True for iOS/macOS compatibility to bypass OpenSSL 3.x AES defaults.
     """
     ssid = extracted_data.get('ssid', 'eduroam')
-    p12_path = os.path.join(output_dir, f"{ssid}_client.p12")
+
+    # Give the iOS/legacy bundle a distinct filename so it doesn't overwrite the secure one
+    suffix = "_ios_client.p12" if legacy else "_client.p12"
+    p12_path = os.path.join(output_dir, f"{ssid}{suffix}")
+
     client_cert = os.path.join(output_dir, "client.pem")
     private_key = os.path.join(output_dir, "private_key.pem")
     ca_root = os.path.join(output_dir, "ca_root.pem")
@@ -491,7 +495,7 @@ def generate_p12_bundle(extracted_data, output_dir="/tmp/aqc"):
         print("[!] Client cert or private key missing, cannot generate .p12 bundle.")
         return None
 
-    # OpenSSL command to bundle cert, key, and optional CA chain into a .p12 file
+    # Base OpenSSL command
     cmd = [
         "openssl", "pkcs12", "-export",
         "-out", p12_path,
@@ -501,9 +505,14 @@ def generate_p12_bundle(extracted_data, output_dir="/tmp/aqc"):
         "-password", f"pass:{password}"
     ]
 
+    # Inject the -legacy flag if requested for Apple devices
+    if legacy:
+        cmd.insert(3, "-legacy")
+
     try:
         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print(f"[✓] Android PKCS#12 bundle written to {p12_path}")
+        target_name = "iOS Legacy" if legacy else "Standard Secure"
+        print(f"[✓] {target_name} PKCS#12 bundle written to {p12_path}")
         return p12_path
     except subprocess.CalledProcessError as e:
         print(f"[!] Failed to generate .p12 file: {e.stderr.decode().strip()}")

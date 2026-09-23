@@ -46,6 +46,7 @@ def parse_args():
     parser.add_argument('--welcome-only', action="store_true", help="Show the absolutely glroious logo that I took 2 hours to make MANUALLY in vim")
     parser.add_argument("--renew", action="store_true", help="Renew existing certificates using your saved private key and credentials")
     parser.add_argument("--qr", action="store_true", help="Host generated files locally and display a terminal QR code for mobile devices")
+    parser.add_argument("--port", "-p", type=int, help="Specify the port for the web server to listen on (default: 8080)")
     return parser.parse_args()
 
 
@@ -240,9 +241,13 @@ def main():
     certs.post_csr_request(config_values, BASE_URL, USER_AGENT, reenroll=args.renew)
     certs.process_csr_response(extracted_data)
 
-    p12_file = generate_p12_bundle(extracted_data, output_dir="/tmp/aqc")
+    p12_file = generate_p12_bundle(extracted_data, output_dir="/tmp/aqc", legacy=False)
     if p12_file:
         created_configs.append(p12_file)
+
+    p12_legacy_file = generate_p12_bundle(extracted_data, output_dir="/tmp/aqc", legacy=True)
+    if p12_legacy_file:
+        created_configs.append(p12_legacy_file)
 
     utils.display_wifi_client_info(extracted_data)
 
@@ -275,12 +280,15 @@ def main():
         for cfg in created_configs:
             if os.path.exists(cfg):
                 shutil.copy(cfg, share_dir)
+
         if extracted_data.get("client_cert") and os.path.exists(extracted_data["client_cert"]):
             shutil.copy(extracted_data["client_cert"], share_dir)
         if extracted_data.get("root_cert") and os.path.exists(extracted_data["root_cert"]):
             shutil.copy(extracted_data["root_cert"], share_dir)
-
-        launch_secure_qr_server(share_dir, extracted_data)
+        if extracted_data.get("priv_key") and os.path.exists(extracted_data["priv_key"]):
+            shutil.copy(extracted_data["priv_key"], share_dir)
+ 
+        launch_secure_qr_server(share_dir, args.port, extracted_data)
 
     utils.cleanup_tmp(args)
 

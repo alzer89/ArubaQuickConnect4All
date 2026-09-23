@@ -373,6 +373,15 @@ def install_iwd_config(extracted_data, sdbinary):
 def cleanup_tmp(args):
     if not args.noclean:
         print("[*] Cleaning up temporary directory /tmp/aqc...")
-        shutil.rmtree("/tmp/aqc", ignore_errors=True)
+        try:
+            shutil.rmtree("/tmp/aqc", ignore_errors=True)
+            shutil.os.remove("/tmp/ArubaQuickConnect.sh")
+            if args.qr:
+                print("[*] Cleaning up temporary web server directory /tmp/aqc_share...")
+                shutil.rmtree("/tmp/aqc_share", ignore_errors=True)
+        except:
+            pass # Meh...
     else:
         print("[!] --noclean specified, leaving /tmp/aqc intact.")
+        print("    Also leaving /tmp/ArubaQuickConnect.sh intact.")
+        print("    Also leaving /tmp/aqc_share intact.")

@@ -157,9 +157,19 @@ def generate_apple_mobileconfig(created_configs, extracted_data, cert_path="/tmp
     profile_uuid = str(uuid.uuid4())
     wifi_uuid = str(uuid.uuid4())
     ca_uuid = str(uuid.uuid4())
+    cert_uuid = str(uuid.uuid4())
 
     root_ca_path = extracted_data.get('root_cert', '/tmp/aqc/ca_root.pem')
     ca_cert_base64 = _pem_to_base64_der(root_ca_path)
+
+    # Convert client cert/key or read a combined p12 if available
+    # For this fix, we assume extracted_data has a base64 version or we generate/read the p12 bytes
+    p12_path = extracted_data.get('p12_path', f"/tmp/aqc/{ssid}_ios_client.p12")
+    if os.path.exists(p12_path):
+        with open(p12_path, "rb") as pf:
+            p12_base64 = base64.b64encode(pf.read()).decode('utf-8')
+    else:
+        p12_base64 = "" # Fallback if p12 isn't pre-built
 
     with open(mobileconfig_path, "w") as f:
         f.write(f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -167,7 +177,7 @@ def generate_apple_mobileconfig(created_configs, extracted_data, cert_path="/tmp
 <plist version="1.0">
 <dict>
     <key>PayloadDisplayName</key>
-    <string>{ssid} Enterprise Wi-Fi</string>
+    <string>{ssid} Wi-Fi (aqc4all)</string>
     <key>PayloadDescription</key>
     <string>Secure EAP-TLS configuration profile for {ssid}</string>
     <key>PayloadIdentifier</key>
@@ -182,7 +192,7 @@ def generate_apple_mobileconfig(created_configs, extracted_data, cert_path="/tmp
     <false/>
     <key>PayloadContent</key>
     <array>
-        <!-- Root CA Certificate Payload for Server Trust Pinning -->
+        <!-- Root CA Certificate Payload -->
         <dict>
             <key>PayloadCertificateFileName</key>
             <string>ca_root.cer</string>
@@ -198,6 +208,26 @@ def generate_apple_mobileconfig(created_configs, extracted_data, cert_path="/tmp
             <string>{ca_uuid}</string>
             <key>PayloadVersion</key>
             <integer>1</integer>
+        </dict>
+
+        <!-- Client Certificate (PKCS#12) Payload -->
+        <dict>
+            <key>PayloadContent</key>
+            <data>{p12_base64}</data>
+            <key>PayloadCertificateFileName</key>
+            <string>client_bundle.p12</string>
+            <key>PayloadDisplayName</key>
+            <string>Client Certificate ({ssid})</string>
+            <key>PayloadIdentifier</key>
+            <string>com.aruba.quickconnect.pkcs12.{ssid.lower().replace(' ', '')}</string>
+            <key>PayloadType</key>
+            <string>com.apple.security.pkcs12</string>
+            <key>PayloadUUID</key>
+            <string>{cert_uuid}</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+            <key>Password</key>
+            <string>{extracted_data['password']}</string>
         </dict>
 
         <!-- Managed Wi-Fi Payload -->
@@ -230,6 +260,10 @@ def generate_apple_mobileconfig(created_configs, extracted_data, cert_path="/tmp
                 </array>
                 <key>UserName</key>
                 <string>{extracted_data['username']}</string>
+                <key>TLSCertificateIsRequired</key>
+                <true/>
+                <key>PayloadCertificateUUID</key>
+                <string>{cert_uuid}</string>
             </dict>
         </dict>
     </array>
