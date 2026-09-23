@@ -190,11 +190,11 @@ method=auto</div>
                             <div class="code-block" id="cmd-nm">
                                 sudo cp {{nmconnection_file}} /etc/NetworkManager/system-connections/<br>
                                 sudo chmod 600 /etc/NetworkManager/system-connections/{{nmconnection_file}}<br>
-                                sudo systemctl restart NetworkManager
-                                # If you don't use systemd, then you already
-                                # KNOW what to type instead of these...
-                                # In fact, why don't you just stop being
-                                # lazy and RUN THIS ON YOUR OWN MACHINE...?
+                                sudo systemctl restart NetworkManager<br>
+                                # If you don't use systemd, then you already<br>
+                                # KNOW what to type instead of these...<br>
+                                # In fact, why don't you just stop being<br>
+                                # lazy and RUN THIS ON YOUR OWN MACHINE...?<br>
                             </div>
                         </details>
 
