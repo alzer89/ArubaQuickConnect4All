@@ -151,7 +151,7 @@ def _pem_to_base64_der(pem_path):
             lines.append(line.strip())
     return "".join(lines)
 
-def generate_chromeos_onc_config(created_configs, extracted_data)
+def generate_chromeos_onc_config(created_configs, extracted_data):
     cert_path = extracted_data['client_cert']
     key_path = extracted_data['priv_key']
     ca_path = extracted_data['root_cert']
