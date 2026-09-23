@@ -147,8 +147,7 @@ class SecureAuthHandler(http.server.SimpleHTTPRequestHandler):
                 </div>"""
 
             # POSIX devices
-            elif (detected_platform == "game_console" or \
-                    detected_platform == "tizen" or \
+            elif (detected_platform == "tizen" or \
                     detected_platform == "openwrt" or \
                     detected_platform == "linux" or \
                     detected_platform == "bsd") \
