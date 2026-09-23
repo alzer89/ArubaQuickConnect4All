@@ -140,7 +140,7 @@ class SecureAuthHandler(http.server.SimpleHTTPRequestHandler):
             if detected_platform == "apple" and mobileconfig_file:
                 primary_action_html = f"""
                 <div class="highlight-box">
-                    <span class="badge">Detected: Apple (iOS / iPadOS / macOS)</span>
+                    <span class="badge" style="background: #000000;">Apple Device</span>
                     <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 170 170" style="vertical-align: middle; margin-right: 6px; fill: currentColor;"><path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.05-7.6-7.8-11.7-14.25-6.35-10.15-11.45-21.46-15.3-33.92-3.85-12.46-5.78-24.34-5.78-35.63 0-14.16 3.65-25.68 10.95-34.56 7.3-8.88 16.54-13.38 27.72-13.51 5.43 0 11.04 1.41 16.83 4.23 5.79 2.82 9.68 4.23 11.67 4.23 1.74 0 5.79-1.52 12.15-4.56 6.36-3.04 12.35-4.4 17.98-4.08 15.7 1.14 27.8 7.38 36.31 18.72-13.2 8.04-19.68 19.32-19.44 33.84.22 11.68 4.67 21.2 13.35 28.56 6.45 5.54 14.18 8.94 23.19 10.2-2.93 8.78-6.52 17.07-10.77 24.87zM119.22 31.81c0-7.84 2.79-15.24 8.37-22.2 5.58-6.96 12.63-10.95 21.15-11.97.11 1.09.17 2.07.17 2.94 0 7.84-2.82 15.35-8.46 22.53-5.64 7.18-12.72 11.23-21.24 12.15-.05-.87-.09-1.9-.09-3.09z"/></svg> 1-Tap Auto-Configuration</h3>
                     <p>Tap below to install your <code>{self.wifi_ssid}</code> profile:</p>
                     <a href="/{mobileconfig_file}{token_suffix}" class="btn">Install Profile ({mobileconfig_file})</a>
@@ -155,7 +155,7 @@ class SecureAuthHandler(http.server.SimpleHTTPRequestHandler):
                     and nmconnection_file:
                 primary_action_html = f"""
                 <div class="highlight-box" style="background: #f0f4f8; border: 1px solid #d0e1fd;">
-                    <span class="badge" style="background: #0055a5;">Detected: BSD / Linux / Other POSIX</span>
+                    <span class="badge" style="background: #731205;">BSD / Linux / Other POSIX</span>
                     <h3><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" style="vertical-align: middle; margin-right: 6px; fill: currentColor;"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-5 14H4v-2h11v2zm3-4H4v-2h14v2zm0-4H4V8h14v2z"/></svg> Here's the terminal commands you guys seem to love so much...</h3>
                     <p style="font-size: 13px; color: #555;">Step 1: Download your certs/keys.</p>
 
@@ -371,7 +371,7 @@ config wifi-iface 'eap_tls_client'
             elif detected_platform == "android":
                 primary_action_html = f"""
                 <div class="highlight-box" style="background: #f0f4f8; border: 1px solid #d0e1fd;">
-                    <span class="badge" style="background: #0055a5;">Detected: Android</span>
+                    <span class="badge" style="background: #3ddc84;">Android</span>
                     <h3 style="margin-top: 8px;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" style="vertical-align: middle; margin-right: 6px; fill: currentColor;"><path d="M17.523 15.341c.455 0 .825-.37.825-.825v-4.125a.825.825 0 0 0-.825-.825.825.825 0 0 0-.825.825v4.125c0 .455.37.825.825.825zm-11.046 0c.455 0 .825-.37.825-.825v-4.125a.825.825 0 0 0-.825-.825.825.825 0 0 0-.825.825v4.125c0 .455.37.825.825.825zm11.282-9.431l1.554-2.693a.412.412 0 0 0-.151-.563.413.413 0 0 0-.563.151l-1.579 2.735a11.243 11.243 0 0 0-4.084-.799c-1.465 0-2.868.286-4.084.799L6.378 2.495a.413.413 0 0 0-.563-.151.412.412 0 0 0-.151.563l1.554 2.693C4.945 7.176 3.75 9.17 3.375 11.454h17.25c-.375-2.284-1.57-4.278-3.076-5.544zM8.25 8.25a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5zm7.5 0a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5zM3.375 12.375h17.25V18c0 1.243-1.007 2.25-2.25 2.25h-1.125v1.875a.75.75 0 1 1-1.5 0V20.25H9.75v1.875a.75.75 0 1 1-1.5 0V20.25H7.125c-1.243 0-2.25-1.007-2.25-2.25v-5.625z"/></svg> Android Setup Instructions</h3>
                     <p style="font-size: 13px; color: #555;">Because Android only lets you install 1-tap configs via Mobile Device Management, you will have to do the steps yourself. But don't worry, we have made it as easy as possible.</p>
 
@@ -445,11 +445,12 @@ config wifi-iface 'eap_tls_client'
             elif detected_platform == 'windows':
                 primary_action_html = f"""
                     <div class="highlight-box">
-                        <span class="badge">Windows Detected</span>
+                        <span class="badge" style="background:#f4b400; color:#357ec7;">Windows</span>
                         <h3>1-Click Windows Profile Setup</h3>
                         <p style="font-size: 13px; margin-bottom: 10px;">
                             We detected you are running Windows. Download and run the automated installer batch script to configure your network instantly.
                         </p>
+                        <a class="btn" href="/{win_xml}{token_suffix}">Download WWAN XML (.xml)</a>
                         <a class="btn" href="/{win_bat}{token_suffix}">Download & Run Installer (.bat)</a>
                         <details style="margin-top: 12px;">
                             <summary>Advanced / Manual Setup Files</summary>
@@ -458,21 +459,52 @@ config wifi-iface 'eap_tls_client'
                             </p>
                         </details>
                     </div>
-                """
+               </div>"""
+
             # Chromebooks
             elif detected_platform == "chromeos":
                 primary_action_html = f"""
-                <div class="highlight-box">
-                    <span class="badge" style="background:#f4b400; color:#202124;">ChromeOS Detected</span>
-                    <h3>Chromebook ONC Network Setup</h3>
-                    <p style="font-size: 13px; margin-bottom: 10px;">
-                        Download your Open Network Configuration (<code style="background:#f1f3f4; padding:2px 4px; border-radius:3px;">.onc</code>) file.<br>
-                        Go to your Chromebook's internet settings or open a browser tab to <code style="background:#f1f3f4; padding:2px 4px; border-radius:3px;">chrome://network#general</code> to import it.<br>
-                    </p>
-                    <a class="btn" href="/{onc_file}{token_suffix}" download>Download ONC Profile</a>
-                </div>
-                """
- 
+                    <div class="highlight-box">
+                        <span class="badge" style="background:#f4b400; color:#ffa700;">ChromeOS</span>
+                        <h3>Chromebook ONC Network Setup</h3>
+                        <p style="font-size: 13px; margin-bottom: 10px;">
+                            Download your Open Network Configuration (<code style="background:#f1f3f4; padding:2px 4px; border-radius:3px;">.onc</code>) file.<br>
+                            Go to your Chromebook's internet settings or open a browser tab to <br><code style="background:#f1f3f4; padding:2px 4px; border-radius:3px;">chrome://network#general</code> to import it.<br>
+                        </p>
+                        <a class="btn" href="/{onc_file}{token_suffix}" download>Download ONC Profile</a>
+                    </div>
+               </div>"""
+
+            # Game Consoles
+            elif detected_platform == "game_console":
+                primary_action_html = f"""
+                    <div class="highlight-box">
+                        <span class="badge" style="background:#f4b400; color:#ffa700;">Game Console</span>
+                        <h3>Setup Instructions</h3>
+                        <p style="font-size: 13px; margin-bottom: 10px;">
+                            You want to connect a game console to enterprise Wi-Fi?<br>
+                            You're either a corporate game developer, or your homelab is on steroids!<br>
+                            Just get an ethernet cable, you maniac!<br>You'll get lower latency that way, too...<br>
+                        </p>
+                        <a class="btn" href="https://en.wikipedia.org/wiki/Loot_box">Lootbox</a>
+                    </div>
+               </div>"""
+
+            # Catch-all
+            else:
+                primary_action_html = f"""
+                    <div class="highlight-box">
+                        <span class="badge" style="background:#f4b400; color:#000000;">Moron Detected</span>
+                        <h1>💀</h1>
+                        <p style="font-size: 13px; margin-bottom: 10px;">
+                            Doesn't exist, you dopey blockhead!<br>
+                            Try something else...<br>
+                        </p>
+                        <a class="btn" href="https://en.wikipedia.org/wiki/Grass">Touch Grass</a>
+                    </div>
+               </div>"""
+
+
             # The certs get placed first, 
             # followed by everything else
             def file_sort_key(filename):
