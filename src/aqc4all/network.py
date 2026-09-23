@@ -1,4 +1,9 @@
 import uuid
+import binascii
+import uuid
+import os
+import base64
+import json
 
 def generate_networkmanager_profile(created_configs, extracted_data, cert_path="/tmp/aqc/client.pem", key_path="/tmp/aqc/private_key.pem"):
     nm_path = f"/tmp/aqc/{extracted_data['ssid']}.nmconnection"
@@ -126,10 +131,6 @@ wpa_supplicant_wlan0="-Dnl80211 -c/etc/wpa_supplicant/wpa_supplicant_{extracted_
     print(f"[✓] netifrc config written to {net_path}")
     created_configs.append(f"{net_path}")
 
-import uuid
-import os
-import base64
-
 def _pem_to_base64_der(pem_path):
     """Helper to convert a PEM certificate file into raw base64 DER for mobileconfig <data> tags."""
     if not os.path.exists(pem_path):
@@ -150,6 +151,193 @@ def _pem_to_base64_der(pem_path):
             lines.append(line.strip())
     return "".join(lines)
 
+def generate_chromeos_onc_config(created_configs, extracted_data)
+    cert_path = extracted_data['client_cert']
+    key_path = extracted_data['priv_key']
+    ca_path = extracted_data['root_cert']
+    ssid = extracted_data['ssid']
+    safe_ssid = ssid.lower().replace(' ', '_')
+    onc_path = f"/tmp/aqc/{safe_ssid}.onc"
+
+    try:
+        with open(ca_path, "r") as f:
+            ca_pem = f.read()
+        with open(cert_path, "r") as f:
+            client_cert_pem = f.read()
+        with open(key_path, "r") as f:
+            private_key_pem = f.read()
+    except FileNotFoundError as e:
+        print(f"[!] Warning: Missing certificate file for ONC generation: {e}")
+        ca_pem, client_cert_pem, private_key_pem = "", "", ""
+
+    ca_guid = f"cert-ca-{safe_ssid}"
+    client_guid = f"cert-client-{safe_ssid}"
+
+    onc_data = {
+        "Type": "UnencryptedConfiguration",
+        "NetworkConfigurations": [
+            {
+                "GUID": f"wifi-eap-tls-{safe_ssid}",
+                "Name": ssid,
+                "Type": "WiFi",
+                "WiFi": {
+                    "AutoConnect": True,
+                    "SSID": ssid,
+                    "Security": "WPA-EAP",
+                    "EAP": {
+                        "Outer": "EAP-TLS",
+                        "Identity": extracted_data['username'],
+                        "ClientCertType": "Ref",
+                        "ClientCertRef": client_guid,
+                        "ServerCARefs": [ca_guid]
+                    }
+                }
+            }
+        ],
+        "Certificates": [
+            {
+                "GUID": ca_guid,
+                "Type": "Authority",
+                "X509": ca_pem
+            },
+            {
+                "GUID": client_guid,
+                "Type": "Client",
+                "X509": client_cert_pem,
+                "PrivateKeyPEM": private_key_pem
+            }
+        ]
+    }
+
+    with open(onc_path, "w", encoding="utf-8") as f:
+        json.dump(onc_data, f, indent=4)
+
+    print(f"[✓] ChromeOS ONC config written to {onc_path}")
+    created_configs.append(onc_path)
+
+def generate_windows_xml_profile(created_configs, extracted_data):
+    cert_path = extracted_data['client_cert']
+    key_path = extracted_data['priv_key']
+    ssid = extracted_data['ssid']
+    # Oh wait, this has to run on WINDOWS.  Better do some stuff to it...
+    safe_ssid_name = ssid.lower().replace(' ', '_')
+    xml_path = f"/tmp/aqc/{safe_ssid_name}_windows.xml"
+    bat_path = f"/tmp/aqc/install_{safe_ssid_name}_windows.bat"
+
+    # Windows XML requires the SSID converted to Hexadecimal format, because, who knows...
+    ssid_hex = binascii.hexlify(ssid.encode('utf-8')).decode('utf-8')
+
+    # WLAN XML Profile - The meat and potatoes of Wi-Fi on Windows
+    xml_content = f"""<?xml version="1.0"?>
+<WLANProfile xmlns="http://www.microsoft.com/networking/WLAN/profile/v1">
+    <name>{ssid}</name>
+    <SSIDConfig>
+        <SSID>
+            <!-- Yeah, Windows wants the SSID in HEXADEMICAL as well... --->
+            <hex>{ssid_hex}</hex>
+            <name>{ssid}</name>
+        </SSID>
+    </SSIDConfig>
+    <connectionType>ess</connectionType>
+    <connectionMode>auto</connectionMode>
+    <MSM>
+        <security>
+            <authEncryption>
+                <auth>WPA2</auth>
+                <encryption>AES</encryption>
+                <useOneX>true</useOneX>
+            </authEncryption>
+            <OneX xmlns="http://www.microsoft.com/networking/onenx/v1">
+                <cacheUserData>true</cacheUserData>
+                <authMode>user</authMode>
+                <EAPConfig>
+                    <EapHostConfig xmlns="http://www.microsoft.com/provisioning/EapHostConfig">
+                        <Eap>
+                            <Type>13</Type>
+                            <Authoritative>true</Authoritative>
+                            <EapMethod>
+                                <Type>13</Type>
+                                <VendorId>0</VendorId>
+                                <VendorType>0</VendorType>
+                                <Authoritative>true</Authoritative>
+                            </EapMethod>
+                            <!-- Configures EAP-TLS to trust the CA by default and look for client certs automatically, because...Windows... (-_-') -->
+                            <Config xmlns:base="http://www.microsoft.com/provisioning/EapBasePropertiesV1">
+                                <base:EapTlsProperties>
+                                    <base:MaxAuthenticationFailures>1</base:MaxAuthenticationFailures>
+                                    <base:AdjustServerName>false</base:AdjustServerName>
+                                    <base:DisableUserPromptForServerValidation>true</base:DisableUserPromptForServerValidation>
+                                    <base:ServerNames></base:ServerNames>
+                                    <base:TrustedRootCAHash></base:TrustedRootCAHash>
+                                    <base:ClientCertificateSelection>
+                                        <base:AutoSelectCredential>true</base:AutoSelectCredential>
+                                    </base:ClientCertificateSelection>
+                                    <base:AllowFreshCredentials>false</base:AllowFreshCredentials>
+                                </base:EapTlsProperties>
+                            </Config>
+                        </Eap>
+                    </EapHostConfig>
+                </EAPConfig>
+            </OneX>
+        </security>
+    </MSM>
+</WLANProfile>
+"""
+    with open(xml_path, "w", encoding="utf-8") as f:
+        f.write(xml_content)
+
+    # Nice little batch script for the Windows user to double-click on
+    bat_content = f"""@echo off
+TITLE Installing Wi-Fi Profile: {ssid}
+echo [*] Adding wireless profile for {ssid} into Windows...
+netsh wlan add profile filename="{safe_ssid_name}_windows.xml" user=all
+echo.
+echo [*] Done! You can now select '{ssid} from your available networks.
+pause
+"""
+    with open(bat_path, "w", encoding="utf-8") as f:
+        f.write(bat_content)
+
+    print(f"[✓] Windows XML profile written to {xml_path}")
+    print(f"[✓] Windows installer batch script written to {bat_path}")
+
+    created_configs.append(xml_path)
+    created_configs.append(bat_path)
+
+def generate_openwrt_config(created_configs, extracted_data, cert_path="/etc/certs/client.pem", key_path="/etc/certs/private_key.pem", ca_path="/etc/certs/ca.pem"):
+    ssid = extracted_data['ssid']
+    safe_ssid = ssid.lower().replace(' ', '_')
+    openwrt_path = f"/tmp/aqc/{safe_ssid}_openwrt.include"
+
+    config_content = f"""
+# OpenWrt UCI Wireless Configuration Snippet for EAP-TLS
+# Useful if you want to make your OpenWRT device a network proxy
+# 1. Copy certificates to /etc/certs/ on the router
+# 2. Append the block below to /etc/config/wireless
+# Note: Requires the full 'wpad' package (apk add wpad | opkg install wpad).
+# wpad-mini will not work...
+
+config wifi-iface 'eap_tls_client'
+    option device 'radio0'
+    option mode 'sta'
+    option ssid '{ssid}'
+    option network 'wwan'
+    option encryption 'wpa2-eap'
+    option eap_type 'tls'
+    option identity '{extracted_data['username']}'
+    option ca_cert '{ca_path}'
+    option client_cert '{cert_path}'
+    option private_key '{key_path}'
+    option private_key_passwd '{extracted_data['password']}'
+
+"""
+
+    with open(openwrt_path, "w", encoding="utf-8") as f:
+        f.write(config_content)
+
+    print(f"[✓] OpenWrt configuration snippet written to {openwrt_path}")
+    created_configs.append(openwrt_path)
+
 def generate_apple_mobileconfig(created_configs, extracted_data, cert_path="/tmp/aqc/client.pem", key_path="/tmp/aqc/private_key.pem"):
     ssid = extracted_data['ssid']
     mobileconfig_path = f"/tmp/aqc/{ssid}.mobileconfig"
@@ -169,7 +357,7 @@ def generate_apple_mobileconfig(created_configs, extracted_data, cert_path="/tmp
         with open(p12_path, "rb") as pf:
             p12_base64 = base64.b64encode(pf.read()).decode('utf-8')
     else:
-        p12_base64 = "" # Fallback if p12 isn't pre-built
+        p12_base64 = ""
 
     with open(mobileconfig_path, "w") as f:
         f.write(f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -181,7 +369,7 @@ def generate_apple_mobileconfig(created_configs, extracted_data, cert_path="/tmp
     <key>PayloadDescription</key>
     <string>Secure EAP-TLS configuration profile for {ssid}</string>
     <key>PayloadIdentifier</key>
-    <string>com.aruba.quickconnect.{ssid.lower().replace(' ', '')}</string>
+    <string>com.aqc4all.utility.{ssid.lower().replace(' ', '')}</string>
     <key>PayloadType</key>
     <string>Configuration</string>
     <key>PayloadUUID</key>
@@ -201,7 +389,7 @@ def generate_apple_mobileconfig(created_configs, extracted_data, cert_path="/tmp
             <key>PayloadDisplayName</key>
             <string>Root CA Certificate ({ssid})</string>
             <key>PayloadIdentifier</key>
-            <string>com.aruba.quickconnect.ca.{ssid.lower().replace(' ', '')}</string>
+            <string>com.aqc4all.utility.ca.{ssid.lower().replace(' ', '')}</string>
             <key>PayloadType</key>
             <string>com.apple.security.root</string>
             <key>PayloadUUID</key>
@@ -219,7 +407,7 @@ def generate_apple_mobileconfig(created_configs, extracted_data, cert_path="/tmp
             <key>PayloadDisplayName</key>
             <string>Client Certificate ({ssid})</string>
             <key>PayloadIdentifier</key>
-            <string>com.aruba.quickconnect.pkcs12.{ssid.lower().replace(' ', '')}</string>
+            <string>com.aqc4all.utility.pkcs12.{ssid.lower().replace(' ', '')}</string>
             <key>PayloadType</key>
             <string>com.apple.security.pkcs12</string>
             <key>PayloadUUID</key>
@@ -235,7 +423,7 @@ def generate_apple_mobileconfig(created_configs, extracted_data, cert_path="/tmp
             <key>PayloadType</key>
             <string>com.apple.wifi.managed</string>
             <key>PayloadIdentifier</key>
-            <string>com.aruba.quickconnect.wifi.{ssid.lower().replace(' ', '')}</string>
+            <string>com.aqc4all.utility.wifi.{ssid.lower().replace(' ', '')}</string>
             <key>PayloadUUID</key>
             <string>{wifi_uuid}</string>
             <key>PayloadVersion</key>

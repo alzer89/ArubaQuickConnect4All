@@ -7,7 +7,7 @@ What this means is that if you're running Debian, Arch, Fedora, Gentoo, Slackwar
 
 Aruba's onboarding portal straight-up refuses to offer you the download link, unless you have "Ubuntu" in your User-Agent.
 
-, IT departments are usually unable (or unwilling) to help Linux users connect.
+Also, IT departments are usually unable (or unwilling) to help Linux users connect.
 
 So we built this.
 
@@ -26,6 +26,12 @@ So we built this.
     - `wicked`
     - `netctl`
     - `netifrc`
+    - Apple `.mobileconfig` profiles
+    - Windows WLAN XML
+    - ChromeOS ONC
+    - OpenWRT
+- Optionally spin up a web server and display a QR code on the screen that when scanned, will allow any device on the same network to quickly and easily get the generated configs downloaded and installed
+- Handles renewals of expired certificates easily
 
 It will also generate Android configs for you that aren't locked up with someone else's key, so you can change them!
 
@@ -35,10 +41,13 @@ Same for BSD support.  There's no reason it shouldn't work, we just haven't test
 
 ## Why use this and not the official tool?
 - Works on any Linux distribution (and likely BSD)
+   - ...and literally anything that can run Python...
 - Works with almost any networking components
    - And saves the raw files, so you can manually configure it later, if you choose
 - Generates key lengths that are actually considered "safe" (minimum 4096-bit)
-- Much more transaparent than the official tool
+- Feature-parity with the official Aruba tool
+   - And much more transaparent
+- Mobile Device Management (MDM) is not required!
 
 ## Installation
 ```

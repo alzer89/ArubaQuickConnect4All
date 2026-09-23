@@ -37,12 +37,15 @@ class SecureAuthHandler(http.server.SimpleHTTPRequestHandler):
         query_params = urllib.parse.parse_qs(parsed_path.query)
 
         token = query_params.get("token", [None])[0]
+        token_suffix = f"?token={token}" if token else ""
+
         if token and token == self.server_auth_password:
             # Bypass standard basic auth if valid token query param is present
             pass
         elif not self._authenticate():
             return
-        token = query_params.get("token", [None])[0]
+
+        forced_os = query_params.get("os", [None])[0]
 
         clean_path = parsed_path.path
 
@@ -64,22 +67,60 @@ class SecureAuthHandler(http.server.SimpleHTTPRequestHandler):
                 files = []
 
             # "Hi, I'm a Mac..." "...and I'm a PC"
-            ua = self.headers.get('User-Agent', '')
-            detected_platform = "unknown"
-            if 'iPhone' in ua or 'iPad' in ua or 'iPod' in ua:
-                detected_platform = "apple"
-            elif 'Android' in ua:
-                detected_platform = "android"
-            elif 'Linux' in ua:
+            ua = self.headers.get("User-Agent", "")
+
+            # Nice little OS detection
+            platform_signatures = [
+                # No idea what to do about game consoles...
+                ("game_console", lambda u: any(k in u for k in ["PlayStation", "Nintendo", "Xbox"])),
+                ("apple", lambda u: any(k in u for k in ["iPhone", "iPad", "iPod", "watchOS", "AppleTV", "Macintosh", "Mac OS X"])),
+                # Windows has to come BEFORE Android, because the Nokia Lumia is technically 
+                # a WINDOWS phone, and has both "Windows" and "Android" in the User_Agent
+                ("windows", lambda u: any(k in u for k in ["Windows", "Win64"])),
+                # Android has to come BEFORE Linux, because a lot of 
+                # phones have "Linux; Android" in their User-Agent
+                ("android", lambda u: "Android" in u),
+                ("chromeos", lambda u: "CrOS" in u),
+                # Anything that doesn't ALSO call itself something
+                # else must be a Linux distro or a Linux phone...
+                ("linux", lambda u: any(k in u for k in ["Linux", "Tizen", "OpenWRT"])),
+                # BSD is always last, because they never
+                # EVER pretend to be anything else ;-)
+                ("bsd", lambda u: "bsd" in u.lower()),
+
+            ]
+
+            detected_platform = forced_os.lower() if forced_os else None
+
+            if not detected_platform:
+                # If the user is a moron, default back to Linux
                 detected_platform = "linux"
-            elif 'bsd' in ua.lower():
-                detected_platform = "bsd"
-            elif 'Macintosh' in ua or 'Mac OS X' in ua:
-                detected_platform = "apple"
-                # These guys should be able to use the .mobileconfigs too
-            elif 'Windows' in ua:
-                detected_platform = "windows"
-                # Honestly haven't figured out what to do with these poor souls...
+                for plat_name, matcher in platform_signatures:
+                    if matcher(ua):
+                        detected_platform = plat_name
+                        break
+
+            # Build query helper links for the override switcher header
+            base_url_params = f"/?token={token}" if token else "/"
+            os_switcher_html = f"""
+            <div style="text-align: center; margin-top: 15px; font-size: 12px; color: #666;">
+                Wrong OS detected?
+                <a href="{base_url_params}&os=linux">Linux</a> |
+                <a href="{base_url_params}&os=bsd">BSD</a> |
+                <a href="{base_url_params}&os=apple">Apple (iOS / iPadOS / WatchOS / tvOS / macOS)</a> |
+                <a href="{base_url_params}&os=windows">Windows</a> |
+                <a href="{base_url_params}&os=android">Android</a> |
+                <a href="{base_url_params}&os=chromeos">ChromeOS</a> |
+                <a href="{base_url_params}&os=game_console">Game Console</a> |
+                <a href="{base_url_params}&os=tizen">TizenOS (Smart TVs)</a> |
+                <a href="{base_url_params}&os=openwrt">OpenWRT</a> |
+            </div>
+            """
+
+            win_xml = next((f for f in files if f.endswith("_windows.xml")), None)
+            win_bat = next((f for f in files if f.startswith("install_") and f.endswith(".bat")), None)
+
+            onc_file = next((f for f in files if f.endswith(".onc")), None)
 
             mobileconfig_file = next((f for f in files if f.endswith('.mobileconfig')), None)
             nmconnection_file = next((f for f in files if f.endswith('.nmconnection')), None)
@@ -93,7 +134,6 @@ class SecureAuthHandler(http.server.SimpleHTTPRequestHandler):
             
             token_suffix = f"?token={self.server_auth_password}"
 
-            # Nice little OS detection
             primary_action_html = ""
 
             # Apple devices
@@ -107,7 +147,12 @@ class SecureAuthHandler(http.server.SimpleHTTPRequestHandler):
                 </div>"""
 
             # POSIX devices
-            elif (detected_platform == "linux" or detected_platform == "bsd") and nmconnection_file:
+            elif (detected_platform == "game_console" or \
+                    detected_platform == "tizen" or \
+                    detected_platform == "openwrt" or \
+                    detected_platform == "linux" or \
+                    detected_platform == "bsd") \
+                    and nmconnection_file:
                 primary_action_html = f"""
                 <div class="highlight-box" style="background: #f0f4f8; border: 1px solid #d0e1fd;">
                     <span class="badge" style="background: #0055a5;">Detected: BSD / Linux / Other POSIX</span>
@@ -299,6 +344,26 @@ WPAConfigSection=(
     'private_key_passwd="{self.wifi_password}"'
 )</div>
                        </details>
+
+                       <!-- OpenWRT -->
+                       <details style="background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #d0e1fd;">
+                           <summary>OpenWRT</summary>
+                           <p style="font-size: 12px; color: #666; margin: 8px 0;">Append this to <code>/etc/config/network</code>:</p>
+                           <div class="code-block" id="cmd-openwrt" style="white-space: pre-wrap;">
+config wifi-iface 'eap_tls_client'
+    option device '{nic}'
+    option mode 'sta'
+    option ssid '{self.wifi_ssid}'
+    option network 'wwan'
+    option encryption 'wpa2-eap'
+    option eap_type 'tls'
+    option identity '{self.wifi_username}'
+    option ca_cert '<span class="val-ca">/etc/ssl/certs/{ca_cert_file}</span>'
+    option client_cert '<span class="val-cert">/etc/ssl/certs/{client_cert_file}</span>'
+    option private_key '<span class="val-key">/etc/ssl/private/{client_key_file}</span>'
+    option private_key_passwd '{self.wifi_password}'
+
+                       </details>
                     </div>
                 </div>"""
                            
@@ -376,6 +441,38 @@ WPAConfigSection=(
                     </div>
                </div>"""
 
+            # Windows devices
+            elif detected_platform == 'windows':
+                primary_action_html = f"""
+                    <div class="highlight-box">
+                        <span class="badge">Windows Detected</span>
+                        <h3>1-Click Windows Profile Setup</h3>
+                        <p style="font-size: 13px; margin-bottom: 10px;">
+                            We detected you are running Windows. Download and run the automated installer batch script to configure your network instantly.
+                        </p>
+                        <a class="btn" href="/{win_bat}{token_suffix}">Download & Run Installer (.bat)</a>
+                        <details style="margin-top: 12px;">
+                            <summary>Advanced / Manual Setup Files</summary>
+                            <p style="font-size: 12px; color: #666; margin-top: 5px;">
+                                You can also manually import the WLAN XML profile (<code style="background:#f1f3f4; padding:2px 4px; border-radius:3px;">{win_xml}</code>) via command prompt using <code style="background:#f1f3f4; padding:2px 4px; border-radius:3px;">netsh wlan add profile</code>.
+                            </p>
+                        </details>
+                    </div>
+                """
+            # Chromebooks
+            elif detected_platform == "chromeos":
+                primary_action_html = f"""
+                <div class="highlight-box">
+                    <span class="badge" style="background:#f4b400; color:#202124;">ChromeOS Detected</span>
+                    <h3>Chromebook ONC Network Setup</h3>
+                    <p style="font-size: 13px; margin-bottom: 10px;">
+                        Download your Open Network Configuration (<code style="background:#f1f3f4; padding:2px 4px; border-radius:3px;">.onc</code>) file.<br>
+                        Go to your Chromebook's internet settings or open a browser tab to <code style="background:#f1f3f4; padding:2px 4px; border-radius:3px;">chrome://network#general</code> to import it.<br>
+                    </p>
+                    <a class="btn" href="/{onc_file}{token_suffix}" download>Download ONC Profile</a>
+                </div>
+                """
+ 
             # The certs get placed first, 
             # followed by everything else
             def file_sort_key(filename):
@@ -424,9 +521,9 @@ WPAConfigSection=(
     <div class="card">
         <h1>ArubaQuickConnect4All - {self.wifi_ssid}</h1>
         <p style="font-size: 13px; color: #666;">Finally, I can connect to enterprise networks on MY terms.</p>
+        {os_switcher_html}
 
         {primary_action_html}
-        
         <div class="creds">
             <p style="font-size: 13px; color: #666;">Just in case you need any of the config info:</p>
             <strong>Target SSID:</strong> {self.wifi_ssid}<br>

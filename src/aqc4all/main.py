@@ -261,6 +261,9 @@ def main():
     network.generate_connman_settings(created_configs, extracted_data)
     network.generate_wicked_config(created_configs, extracted_data)
     network.generate_iwd_settings(created_configs, extracted_data)
+    network.generate_windows_xml_profile(created_configs, extracted_data)
+    network.generate_chromeos_onc_config(created_configs, extracted_data)
+    network.generate_openwrt_config(created_configs, extracted_data)
 
     utils.persist_files(created_configs, extracted_data)
     if args.qr:
