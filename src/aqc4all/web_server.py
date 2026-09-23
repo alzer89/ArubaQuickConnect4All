@@ -479,7 +479,10 @@ WPAConfigSection=(
 </body>
 </html>
 """
-            self.wfile.write(html_content.encode('utf-8'))
+            try:
+                self.wfile.write(html_content.encode('utf-8'))
+            except (BrokenPipeError, ConnectionResetError):
+                return
             return
 
         self.path = clean_path
@@ -496,7 +499,10 @@ WPAConfigSection=(
         self.send_header("WWW-Authenticate", 'Basic realm="ArubaQuickConnect Secure Download"')
         self.send_header("Content-type", "text/html")
         self.end_headers()
-        self.wfile.write(b"Unauthorized.")
+        try:
+            self.wfile.write(b"Unauthorized.")
+        except (BrokenPipeError, ConnectionResetError):
+            pass
         return False
 
     def log_message(self, format, *args):
