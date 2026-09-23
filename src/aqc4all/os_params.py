@@ -49,7 +49,7 @@ def which_package_manager():
             pkgmanlist.append(value)
 
     if not pkgmanlist:
-        print("[!] No recognized package managers found in PATH.")
+        print("[!] No recognised package managers found in PATH.")
         return None
 
     print("The following package managers have been detected in your PATH:")
@@ -90,6 +90,12 @@ def pkgmanager_commands(package_manager_name):
         return {'name': 'apk', 'update_command': 'update', 'upgrade_command': 'upgrade', 'install_command': 'add', 'remove_command': 'remove', 'force_command': '', 'yes_command': ''}
     elif 'zypper' in pm_lower:
         return {'name': 'zypper', 'update_command': 'update', 'upgrade_command': 'patch', 'install_command': 'install', 'remove_command': 'remove', 'force_command': '--force', 'yes_command': '-y'}
+    elif 'nix' in pm_lower:
+        # Accounts for both 'nix profile' and 'nix-env'
+        if shutil.which("nix") and "profile" in subprocess.run(["nix", "--help"], capture_output=True, text=True).stdout:
+            return {'name': 'nix', 'update_command': '', 'upgrade_command': '', 'install_command': 'profile install', 'remove_command': 'profile remove', 'force_command': '', 'yes_command': ''}
+        else:
+            return {'name': 'nix-env', 'update_command': '-u', 'upgrade_command': '-u', 'install_command': '-iA', 'remove_command': '-e', 'force_command': '', 'yes_command': ''}
     # Template in case we've missed any package managers
     #elif '<package_manager>' in pm_lower:
     #    return {'name': '<name>', 'update_command': '<update>', 'upgrade_command': '<upgrade>', 'install_command': '<install>', 'remove_command': '<remove>', 'force_command': '<force>', 'yes_command': '<-y>'}
@@ -122,7 +128,7 @@ def check_for_dependencies(args):
         elif browser_choice in ['chromium', 'google-chrome', 'chrome', 'brave', 'edge', 'vivaldi', 'opera']:
             browser_driver = 'chromedriver'
         else:
-            print(f"Error: Specified browser '{browser_choice}' is not supported or recognized.")
+            print(f"Error: Specified browser '{browser_choice}' is not supported or recognised.")
             sys.exit(1)
 
         target_binaries = [browser_choice]
@@ -163,12 +169,12 @@ def check_for_driver(args, browser_driver):
     # Crap, I forgot about NixOS...
     is_nixos = os.path.exists("/etc/NIXOS") or shutil.which("nix")
 
-    if "geckodriver" in browser_driver:
-        browser = "firefox"
-    else:
-        browser = "chromium"
-
     if is_nixos:
+        if "geckodriver" in browser_driver:
+            browser = "firefox"
+        else:
+            browser = "chromium"
+
         print("\n[!] A-HA! NixOS environment detected!")
         print("    NixOS handles packages declaratively and uses a non-standard dynamic linker.")
         print("    (But given that you're running NixOS, I have no doubt you already knew that!)")
