@@ -444,7 +444,7 @@ config wifi-iface 'eap_tls_client'
             elif detected_platform == 'windows':
                 primary_action_html = f"""
                     <div class="highlight-box">
-                        <span class="badge" style="background:#f4b400; color:#357ec7;">Windows</span>
+                        <span class="badge" style="background:#357ec7; color:#ffffff;">Windows</span>
                         <h3>1-Click Windows Profile Setup</h3>
                         <p style="font-size: 13px; margin-bottom: 10px;">
                             We detected you are running Windows. Download and run the automated installer batch script to configure your network instantly.
@@ -464,7 +464,7 @@ config wifi-iface 'eap_tls_client'
             elif detected_platform == "chromeos":
                 primary_action_html = f"""
                     <div class="highlight-box">
-                        <span class="badge" style="background:#f4b400; color:#ffa700;">ChromeOS</span>
+                        <span class="badge" style="background:#ffa700; color:#000000;">ChromeOS</span>
                         <h3>Chromebook ONC Network Setup</h3>
                         <p style="font-size: 13px; margin-bottom: 10px;">
                             Download your Open Network Configuration (<code style="background:#f1f3f4; padding:2px 4px; border-radius:3px;">.onc</code>) file.<br>
