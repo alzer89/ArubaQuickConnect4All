@@ -351,7 +351,7 @@ WPAConfigSection=(
                            <p style="font-size: 12px; color: #666; margin: 8px 0;">Append this to <code>/etc/config/network</code>:</p>
                            <div class="code-block" id="cmd-openwrt" style="white-space: pre-wrap;">
 config wifi-iface 'eap_tls_client'
-    option device '{nic}'
+    option device '<span class="nic">radio0</span>'
     option mode 'sta'
     option ssid '{self.wifi_ssid}'
     option network 'wwan'

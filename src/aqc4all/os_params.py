@@ -159,12 +159,33 @@ def check_for_driver(args, browser_driver):
         return True
 
     print(f"[!] {browser_driver} not found in PATH.")
+
+    # Crap, I forgot about NixOS...
+    is_nixos = os.path.exists("/etc/NIXOS") or shutil.which("nix")
+
+    if "geckodriver" in browser_driver:
+        browser = "firefox"
+    else:
+        browser = "chromium"
+
+    if is_nixos:
+        print("\n[!] A-HA! NixOS environment detected!")
+        print("    NixOS handles packages declaratively and uses a non-standard dynamic linker.")
+        print("    (But given that you're running NixOS, I have no doubt you already knew that!)")
+        print("    To run aqc4all successfully on NixOS, you have to execute it inside a nix-shell or add the driver:")
+        print(f"    -> nix-shell -p {browser_driver} {browser} python3 ...")
+        print("    Or make sure your flake.devShell includes the respective driver packages.")
+        print("")
+        print("    No, I cannot help you with this. It's above my pay grade,")
+        print("    and if you DO need help, maybe you shouldn't be running NixOS...")
+        sys.exit(1)
+
     proceed = input("Would you like to install it now? [Y/n]: ").strip().lower()
     if proceed in ['', 'y', 'yes', 'oh yeah baby!', 'hurry up']:
         pm_name = which_package_manager()
         if pm_name:
-            pm_config = pkgmanager_commands(pm_name)
             # Pass only the two parameters expected by install_driver
+            pm_config = pkgmanager_commands(pm_name)
             install_driver(browser_driver, pm_config)
     return False
 
