@@ -457,8 +457,7 @@ config wifi-iface 'eap_tls_client'
                                 You can also manually import the WLAN XML profile (<code style="background:#f1f3f4; padding:2px 4px; border-radius:3px;">{win_xml}</code>) via command prompt using <code style="background:#f1f3f4; padding:2px 4px; border-radius:3px;">netsh wlan add profile</code>.
                             </p>
                         </details>
-                    </div>
-               </div>"""
+                   </div>"""
 
             # Chromebooks
             elif detected_platform == "chromeos":
@@ -471,14 +470,13 @@ config wifi-iface 'eap_tls_client'
                             Go to your Chromebook's internet settings or open a browser tab to <br><code style="background:#f1f3f4; padding:2px 4px; border-radius:3px;">chrome://network#general</code> to import it.<br>
                         </p>
                         <a class="btn" href="/{onc_file}{token_suffix}" download>Download ONC Profile</a>
-                    </div>
-               </div>"""
+                    </div>"""
 
             # Game Consoles
             elif detected_platform == "game_console":
                 primary_action_html = f"""
                     <div class="highlight-box">
-                        <span class="badge" style="background:#f4b400; color:#ffa700;">Game Console</span>
+                        <span class="badge" style="background:#ffa700; color:#000000;">Game Console</span>
                         <h3>Setup Instructions</h3>
                         <p style="font-size: 13px; margin-bottom: 10px;">
                             You want to connect a game console to enterprise Wi-Fi?<br>
@@ -486,8 +484,7 @@ config wifi-iface 'eap_tls_client'
                             Just get an ethernet cable, you maniac!<br>You'll get lower latency that way, too...<br>
                         </p>
                         <a class="btn" href="https://en.wikipedia.org/wiki/Loot_box">Lootbox</a>
-                    </div>
-               </div>"""
+                    </div>"""
 
             # Catch-all
             else:
@@ -500,8 +497,7 @@ config wifi-iface 'eap_tls_client'
                             Try something else...<br>
                         </p>
                         <a class="btn" href="https://en.wikipedia.org/wiki/Grass">Touch Grass</a>
-                    </div>
-               </div>"""
+                    </div>"""
 
 
             # The certs get placed first, 
