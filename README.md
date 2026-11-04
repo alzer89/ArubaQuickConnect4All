@@ -12,7 +12,7 @@ Also, IT departments are usually unable (or unwilling) to help Linux users conne
 So we built this.
 
 
-`aqc4all` automates and simplifies the Aruba QuickConnect enrollment process for all Linux systems. Here's what it does differently (and better):
+`aqc4all` automates and simplifies the Aruba QuickConnect enrolment process for all Linux systems. Here's what it does differently (and better):
 - Spoofs the User-Agent to trick the Aruba portal into handing over the precious installer
 - Extracts only the relevant part (read: a one-time pad (OTP) from a config.ini file) from their bloated 43MB installer
 - Generates secure, modern keypairs (unlike the official tool, which requires downgrading OpenSSL)

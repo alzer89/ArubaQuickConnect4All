@@ -11,39 +11,6 @@ import http.server
 import threading
 import segno
 
-def serve_and_display_qr(created_configs, extracted_data):
-    # Find local IP address
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(('10.255.255.255', 1))
-        local_ip = s.getsockname()[0]
-    except Exception:
-        local_ip = '127.0.0.1'
-    finally:
-        s.close()
-
-    port = 8080
-    target_dir = "/tmp/aqc_share"
-    os.makedirs(target_dir, exist_ok=True)
-
-    class Handler(http.server.SimpleHTTPRequestHandler):
-        def translate_path(self, path):
-            return os.path.join(target_dir, os.path.relpath(path, '/'))
-
-    server = http.server.HTTPServer(('0.0.0.0', port), Handler)
-    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
-    server_thread.start()
-
-    url = f"http://{local_ip}:{port}/"
-    print(f"\n[+] Hosting connection files at: {url}")
-    print("[+] Scan this QR code with your Android phone to download your config:\n")
-
-    qr = segno.make(url)
-    qr.terminal(compact=True)
-
-    input("\nPress [Enter] when finished to shut down HTTP server...")
-    server.shutdown()
-
 def replace_string(filename, old_string, new_string):
     try:
         with open(filename, 'r') as file:
@@ -145,6 +112,18 @@ def persist_files(created_configs, extracted_data, target_dir=os.path.expanduser
     except Exception as e:
         print(f"[!] Failed to copy certificate: {e}")
 
+    # Keep a separate copy of the generated files, just in case something goes wrong
+    try:
+        key_store = os.path.expanduser("~/.config/aqc4all")
+        os.makedirs(key_store, mode=0o700, exist_ok=True)
+        os.chmod(key_store, 0o700)
+        renewal_key = os.path.join(key_store, "private_key.pem")
+        shutil.copy2(extracted_data["priv_key"], renewal_key)
+        os.chmod(renewal_key, 0o600)
+        print(f"[✓] Renewal key saved to {renewal_key}")
+    except Exception as e:
+        print(f"[!] Could not save renewal key: {e}")
+
     # Copy all generated config files
     for file in created_configs:
         try:
@@ -180,6 +159,178 @@ def detect_sudo_or_doas():
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
         return False
+
+# For renewing certs
+def read_existing_private_key(ssid=None):
+    home = os.path.expanduser("~")
+    profile_keys = glob.glob(os.path.join(home, "*-files", "private_key.pem"))
+    system_keys = glob.glob("/etc/ssl/private/*_private_key.pem")
+
+    if ssid:
+        candidates = [
+            (ssid, os.path.join(home, f"{ssid}-files", "private_key.pem")),
+            (ssid, f"/etc/ssl/private/{ssid}_private_key.pem"),
+            (None, os.path.join(home, ".config/aqc4all/private_key.pem")),
+            (None, "/tmp/aqc/private_key.pem"),
+        ]
+    else:
+        profiles = {}
+        for path in profile_keys:
+            name = os.path.basename(os.path.dirname(path))
+            profiles[name[:-6] if name.endswith("-files") else name] = path
+        for path in system_keys:
+            name = os.path.basename(path)
+            if name.endswith("_private_key.pem"):
+                profiles.setdefault(name[:-len("_private_key.pem")], path)
+        if len(profiles) > 1:
+            raise ValueError(
+                # Wow, someone REALLY likes AQC-managed networks. Borderline fetish...
+                "multiple saved network keys were found; select one with --ssid "
+                f"({', '.join(sorted(profiles))})"
+            )
+        if profiles:
+            selected_ssid, selected_path = next(iter(profiles.items()))
+            candidates = [(selected_ssid, selected_path)]
+        else:
+            candidates = []
+        candidates.extend([
+            (None, os.path.join(home, ".config/aqc4all/private_key.pem")),
+            (None, "/tmp/aqc/private_key.pem"),
+        ])
+
+    for key_ssid, path in candidates:
+        if not os.path.isfile(path):
+            continue
+        try:
+            with open(path, "rb") as stream:
+                key_data = stream.read()
+        except PermissionError:
+            command = detect_sudo_or_doas()
+            if not command:
+                continue
+            command = command.replace("passwordless_", "")
+            try:
+                result = subprocess.run(
+                    [command, "cat", path], stdout=subprocess.PIPE, check=True
+                )
+                key_data = result.stdout
+            except (OSError, subprocess.CalledProcessError):
+                continue
+        if key_data:
+            return key_ssid or ssid, key_data
+
+    raise FileNotFoundError(
+        "no readable saved private key was found. Enrol normally first, "
+        "or select the correct network with --ssid"
+    )
+
+
+def cleanup_startup_tmp():
+    for path in ("/tmp/aqc", "/tmp/aqc_share", "/tmp/ArubaQuickConnect.sh"):
+        try:
+            if os.path.islink(path) or os.path.isfile(path):
+                os.unlink(path)
+            elif os.path.isdir(path):
+                shutil.rmtree(path)
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            raise RuntimeError(f"could not clean {path}: {exc}") from exc
+    print("[*] Removed previous aqc4all temporary files.")
+
+# Some AQC servers might explicitly only accept renewals of keys they've seen before, hence
+# why this function is here. But honestly, just generate a new keypair if you can...
+def install_renewed_certificates(extracted_data, sdbinary):
+    ssid = extracted_data["ssid"]
+    config_path = os.path.expanduser(f"~/{ssid}-files")
+    commands = [
+        [sdbinary, "mkdir", "-p", "/etc/ssl/certs", "/etc/ssl/private"],
+    ]
+    for source, destination in (
+        ("ca_root.pem", f"/etc/ssl/certs/{ssid}_ca_root.pem"),
+        ("client.pem", f"/etc/ssl/certs/{ssid}_client.pem"),
+        ("private_key.pem", f"/etc/ssl/private/{ssid}_private_key.pem"),
+    ):
+        commands.extend([
+            [sdbinary, "cp", os.path.join(config_path, source), destination],
+            [sdbinary, "chown", "root:root", destination],
+            [sdbinary, "chmod", "600", destination],
+        ])
+    for command in commands:
+        subprocess.run(command, check=True)
+
+def update_existing_installations(extracted_data):
+    ssid = extracted_data["ssid"]
+    targets = []
+    if os.path.exists(f"/etc/NetworkManager/system-connections/{ssid}.nmconnection"):
+        targets.append("NetworkManager")
+    wpa_config = "/etc/wpa_supplicant/wpa_supplicant.conf"
+    if os.path.exists(wpa_config) and _wpa_config_has_ssid(wpa_config, ssid):
+        targets.append("wpa_supplicant")
+    if os.path.exists(f"/etc/netctl/{ssid}"):
+        targets.append("netctl")
+    if os.path.exists(f"/var/lib/connman/{ssid}.config"):
+        targets.append("connman")
+    if os.path.exists(f"/etc/wicked/ifcfg-{ssid}"):
+        targets.append("wicked")
+    if os.path.exists(f"/var/lib/iwd/{ssid}.8021x"):
+        targets.append("iwd")
+
+    if not targets:
+        print("[!] No recognised installed profile was found...")
+        print("[!] Are you sure you enrolled before? I'm saving these 'new' files in your home directory.")
+        return False
+
+    command = detect_sudo_or_doas()
+    if not command:
+        print("[!] sudo/doas is required to replace installed certificates and profiles.")
+        print("[!] or run this as root, if you really want. Hey, it's your machine...")
+        print("[!] MASSIVE DISCLAIMER: Please please PLEASE don't do that... (-_-')-/") 
+        return False
+    command = command.replace("passwordless_", "")
+    print("[*] Updating installed profile(s): " + ", ".join(targets))
+
+    try:
+        install_renewed_certificates(extracted_data, command)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        print(f"[!] Failed to replace installed certificates: {exc}")
+        return False
+
+    for target in targets:
+        if target == "wpa_supplicant":
+            if shutil.which("systemctl"):
+                subprocess.run([command, "systemctl", "restart", "wpa_supplicant"], check=False)
+            else:
+                print("[!] Renewed certificates were installed, but systemctl was not found; restart wpa_supplicant manually.")
+        else:
+            do_install(target, extracted_data, command)
+    return True
+
+def _wpa_config_has_ssid(path, ssid):
+    try:
+        with open(path, "r", encoding="utf-8") as stream:
+            lines = stream.readlines()
+    except (OSError, UnicodeError):
+        command = detect_sudo_or_doas()
+        if not command:
+            return False
+        command = command.replace("passwordless_", "")
+        try:
+            result = subprocess.run(
+                [command, "cat", path], stdout=subprocess.PIPE, check=True, text=True
+            )
+            lines = result.stdout.splitlines()
+        except (OSError, subprocess.CalledProcessError):
+            return False
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped.startswith("ssid="):
+            continue
+        value = stripped.split("=", 1)[1].strip().strip('"')
+        if value == ssid:
+            return True
+    return False
 
 def prompt_to_install(args, extracted_data):
     if not args.noinstall:
@@ -370,18 +521,10 @@ def install_iwd_config(extracted_data, sdbinary):
     except Exception as e:
         print(f"[!] Failed to install IWD config: {e}")
 
+
 def cleanup_tmp(args):
     if not args.noclean:
-        print("[*] Cleaning up temporary directory /tmp/aqc...")
-        try:
-            shutil.rmtree("/tmp/aqc", ignore_errors=True)
-            shutil.os.remove("/tmp/ArubaQuickConnect.sh")
-            if args.qr:
-                print("[*] Cleaning up temporary web server directory /tmp/aqc_share...")
-                shutil.rmtree("/tmp/aqc_share", ignore_errors=True)
-        except:
-            pass # Meh...
+        print("[*] Cleaning up aqc4all temporary files...")
+        cleanup_startup_tmp()
     else:
-        print("[!] --noclean specified, leaving /tmp/aqc intact.")
-        print("    Also leaving /tmp/ArubaQuickConnect.sh intact.")
-        print("    Also leaving /tmp/aqc_share intact.")
+        print("[!] --no-cleanup specified; aqc4all temporary files were left in place.") # Meh...

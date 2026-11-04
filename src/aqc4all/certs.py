@@ -245,7 +245,7 @@ def post_csr_request(config_values, BASE_URL, USER_AGENT, reenroll=False):
             print(f"[✓] CSR reply saved to {reply_file}")
             return True
 
-        print("[!] Server returned an empty response for CSR enrollment.")
+        print("[!] Server returned an empty response for CSR enrolment.")
         return False
 
     except subprocess.CalledProcessError as e:
@@ -381,6 +381,8 @@ def generate_private_key_if_missing(extracted_data, key_path="/tmp/aqc/private_k
             sys.exit(1)
     else:
         print("[*] Private key already exists")
+
+    extracted_data['priv_key'] = key_path
 
     print(f"[i] Private key info: {key_path}")
     os.chmod(key_path, 0o600)

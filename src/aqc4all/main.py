@@ -7,6 +7,8 @@ import textwrap
 import re
 import os
 import time
+import configparser
+import getpass
 from aqc4all.certs import generate_p12_bundle
 
 def parse_args():
@@ -39,17 +41,79 @@ def parse_args():
     parser.add_argument("--totp-secret", type=str, help="Automatically input TOTP (Do NOT use on untrusted machines!)")
     parser.add_argument("--noinstall", action="store_true", help="Don't install generated config & certificates to your system")
     parser.add_argument("--browser", choices=["chromium", "firefox"], help="Supported browsers: Chromium, Firefox")
-    parser.add_argument("--noclean", action="store_true", help="Do not clean /tmp/aqc after completion")
+    parser.add_argument("--noclean", "--no-cleanup", dest="noclean", action="store_true", help="Do not clean any temporary aqc files before or after execution")
     parser.add_argument("--install-only", action="store_true", help="Install previously generated configs and certificates")
     parser.add_argument('--i-work-in-it', action="store_true", help="Special surprise for arrogant IT workers")
     parser.add_argument('--yes-i-know-i-am-root-and-know-what-i-am-doing', action="store_true", help="Only use this if you know what you are doing...")
     parser.add_argument('--welcome-only', action="store_true", help="Show the absolutely glroious logo that I took 2 hours to make MANUALLY in vim")
-    parser.add_argument("--renew", action="store_true", help="Renew existing certificates using your saved private key and credentials")
+    parser.add_argument("--renew", action="store_true", help="Renew using an existing private key (If you really can't be bothered rotating...)")
+    parser.add_argument("--renew-installed", action="store_true", help="Renew using the existing key and update recognised installed profiles")
+    parser.add_argument("--ssid", help="SSID to select when renewing (needed if multiple saved keys exist)")
+    parser.add_argument("--host-existing", nargs="?", const="/tmp/aqc", metavar="DIR", help="Only host existing files from DIR (default: /tmp/aqc) and show a QR code")
     parser.add_argument("--qr", action="store_true", help="Host generated files locally and display a terminal QR code for mobile devices")
-    parser.add_argument("--port", "-p", type=int, help="Specify the port for the web server to listen on (default: 8080)")
+    parser.add_argument("--port", "-p", type=int, default=8080, help="Specify the port for the web server to listen on (default: 8080)")
     return parser.parse_args()
 
+def host_existing_files(args):
+    import pathlib
+    import plistlib
+    from .web_server import launch_secure_qr_server
 
+    target_dir = os.path.abspath(os.path.expanduser(args.host_existing))
+    required_files = ("client.pem", "private_key.pem", "ca_root.pem")
+    missing = [name for name in required_files if not os.path.isfile(os.path.join(target_dir, name))]
+    if missing:
+        raise SystemExit(f"[!] Cannot host {target_dir}: missing {', '.join(missing)}")
+
+    data = {
+        "ssid": args.ssid,
+        "username": args.username,
+        "password": args.password,
+        "client_cert": os.path.join(target_dir, "client.pem"),
+        "priv_key": os.path.join(target_dir, "private_key.pem"),
+        "root_cert": os.path.join(target_dir, "ca_root.pem"),
+    }
+
+    plist_path = os.path.join(target_dir, "payload1.plist")
+    if os.path.isfile(plist_path):
+        try:
+            with open(plist_path, "rb") as stream:
+                payload = plistlib.load(stream)
+            for item in payload.get("PayloadContent", []):
+                eap = item.get("EAPClientConfiguration", {})
+                data["username"] = data["username"] or eap.get("UserName")
+                data["password"] = data["password"] or eap.get("UserPassword")
+                if item.get("PayloadType") == "com.apple.wifi.managed":
+                    data["ssid"] = data["ssid"] or item.get("SSID_STR")
+        except Exception as exc:
+            print(f"[!] Could not read saved payload metadata: {exc}")
+
+    if not data["ssid"] or not data["username"] or not data["password"]:
+        for filename in os.listdir(target_dir):
+            if not filename.endswith(".nmconnection"):
+                continue
+            profile = configparser.ConfigParser(interpolation=None)
+            try:
+                profile.read(os.path.join(target_dir, filename))
+                data["ssid"] = data["ssid"] or profile.get("connection", "id", fallback=None)
+                data["username"] = data["username"] or profile.get("802-1x", "identity", fallback=None)
+                data["password"] = data["password"] or profile.get("802-1x", "private-key-password", fallback=None)
+            except configparser.Error:
+                continue
+
+    if not data["ssid"]:
+        directory_name = pathlib.Path(target_dir).name
+        if directory_name.endswith("-files"):
+            directory_name = directory_name[:-6]
+        if directory_name in ("aqc", "aqc_share"):
+            directory_name = ""
+        data["ssid"] = directory_name or input("SSID: ").strip()
+    if not data["username"]:
+        data["username"] = input("Network username: ").strip()
+    if not data["password"]:
+        data["password"] = getpass.getpass("Certificate/profile password: ")
+
+    launch_secure_qr_server(target_dir, args.port, data)
 
 def check_for_root(args):
     if os.geteuid() == 0:
@@ -209,7 +273,39 @@ def main():
     args = parse_args()
     special_surprise(args)
     welcome_message(args)
-    install_only(args, extracted_data)
+
+    if args.host_existing is not None:
+        host_existing_files(args)
+        return
+
+    if args.install_only:
+        install_only(args, extracted_data)
+        return
+
+    if args.renew_installed:
+        args.renew = True
+        if args.noinstall:
+            raise SystemExit("[!] --renew-installed cannot be combined with --noinstall")
+
+    renewal_key = None
+    if args.renew:
+        try:
+            renewal_ssid, renewal_key = utils.read_existing_private_key(args.ssid)
+            if args.ssid and renewal_ssid and renewal_ssid != args.ssid:
+                raise ValueError(f"Selected key belongs to {renewal_ssid}, not {args.ssid}")
+            args.ssid = args.ssid or renewal_ssid
+        except (OSError, ValueError) as exc:
+            raise SystemExit(f"[!] Cannot renew: {exc}")
+
+    if not args.noclean:
+        utils.cleanup_startup_tmp()
+    if renewal_key is not None:
+        os.makedirs("/tmp/aqc", mode=0o700, exist_ok=True)
+        key_path = "/tmp/aqc/private_key.pem"
+        with open(key_path, "wb") as stream:
+            stream.write(renewal_key)
+        os.chmod(key_path, 0o600)
+
     check_for_root(args)
 
     if args.renew:
@@ -233,6 +329,11 @@ def main():
     time.sleep(1)
     certs.extract_credentials_from_plist(extracted_data)
     certs.extract_certs_from_plist(extracted_data)
+    if args.ssid and extracted_data.get("ssid") != args.ssid:
+        raise SystemExit(
+            f"[!] The portal returned SSID {extracted_data.get('ssid')!r}, "
+            f"but the selected saved profile is {args.ssid!r}. Refusing to update the wrong profile."
+        )
     certs.fetch_and_parse_csrattrs(extracted_data, config_values, BASE_URL, USER_AGENT)
     time.sleep(1)
     certs.generate_private_key_if_missing(extracted_data)
@@ -271,7 +372,10 @@ def main():
 [*] We will spin up your server regardless of whether you 
     answer yes or no to the next prompt. Don't worry...
     """)
-    utils.prompt_to_install(args, extracted_data)
+    if args.renew_installed:
+        utils.update_existing_installations(extracted_data)
+    else:
+        utils.prompt_to_install(args, extracted_data)
 
     if args.qr:
         import shutil

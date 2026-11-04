@@ -432,6 +432,8 @@ def generate_apple_mobileconfig(created_configs, extracted_data, cert_path="/tmp
             <string>Wi-Fi: {ssid}</string>
             <key>SSID_STR</key>
             <string>{ssid}</string>
+            <key>PayloadCertificateUUID</key>
+            <string>{cert_uuid}</string>
             <key>EncryptionType</key>
             <string>WPA2</string>
             <key>AutoJoin</key>
@@ -450,8 +452,6 @@ def generate_apple_mobileconfig(created_configs, extracted_data, cert_path="/tmp
                 <string>{extracted_data['username']}</string>
                 <key>TLSCertificateIsRequired</key>
                 <true/>
-                <key>PayloadCertificateUUID</key>
-                <string>{cert_uuid}</string>
             </dict>
         </dict>
     </array>
