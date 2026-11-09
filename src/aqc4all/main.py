@@ -9,6 +9,8 @@ import os
 import time
 import configparser
 import getpass
+from ipaddress import ip_address
+from urllib.parse import urlsplit
 from aqc4all.certs import generate_p12_bundle
 
 def parse_args():
@@ -130,32 +132,78 @@ def check_for_root(args):
             else:
                 sys.exit(1)
 
+def valid_url(value):
+    if not value or value != value.strip() or any(char.isspace() for char in value):
+        return None
+    try:
+        parsed = urlsplit(value)
+
+        if parsed.scheme.lower() not in {"http", "https", "ftp", "ftps"}:
+            return None
+        if not parsed.netloc or not parsed.hostname:
+            return None
+        if parsed.username is not None or parsed.password is not None:
+            return None
+
+        # Accessing .port checks that the
+        # port is numeric and in range
+        _ = parsed.port
+
+        host = parsed.hostname.rstrip(".")
+        try:
+            ip_address(host)
+            return value
+        except ValueError:
+            pass
+
+        # Accept DNS names, including localhost
+        # and names with any UTF-8 characters
+        ascii_host = host.encode("idna").decode("ascii")
+        labels = ascii_host.split(".")
+        return len(ascii_host) <= 253 and all(
+            label
+            and len(label) <= 63
+            and re.fullmatch(
+                r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?",
+                label,
+            )
+            for label in labels
+        )
+
+    except (UnicodeError, ValueError):
+        return None
+
 def check_for_required_fields(args):
     import getpass
     global USERNAME, PASSWORD, BASE_URL, TOTP_SECRET, BROWSER
-    regex = re.compile(
-            r'^(?:http|ftp)s?://' # http:// or https://
-            r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|' #domain...
-            r'localhost|' #localhost...
-            r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})' # ...or ip
-            r'(?::\d+)?' # optional port
-            r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+    #regex = re.compile(
+    #        r'^(?:http|ftp)s?://' # http:// or https://
+    #        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|' #domain...
+    #        r'localhost|' #localhost...
+    #        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})' # ...or ip
+    #        r'(?::\d+)?' # optional port
+    #        r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+    BASE_URL = None
+    if valid_url(args.portal) is not None:
+        BASE_URL = args.portal
+        BASE_URL = BASE_URL.rstrip('/')
+    else:
+        print("[!] Invalid onboarding portal URL entered...")
+        while BASE_URL is None:
+            BASE_URL = input('Enter the onboarding portal URL (REQUIRED): ')
+            BASE_URL = BASE_URL.rstrip('/')
+            print(BASE_URL)
+            if valid_url(BASE_URL) is not None:
+                break
+            else:
+                print("[!] Invalid URL!")
+                BASE_URL = None
     USERNAME = args.username
     while not USERNAME:
         USERNAME = input('Enter your username (REQUIRED): ')
     PASSWORD = args.password
     while not PASSWORD:
         PASSWORD = getpass.getpass(prompt='Enter your password (REQUIRED): ', stream=None)
-    BASE_URL = args.portal
-    while not BASE_URL:
-        BASE_URL = input('Enter the onboarding portal URL (REQUIRED): ')
-        BASE_URL = BASE_URL.strip('/')
-        print(BASE_URL)
-        if (re.match(regex, BASE_URL) is not None) == True:
-            break
-        else:
-            print("[!] Invalid URL!")
-            BASE_URL = None
     TOTP_SECRET = args.totp_secret
     if not TOTP_SECRET:
         TOTP_SECRET = ""

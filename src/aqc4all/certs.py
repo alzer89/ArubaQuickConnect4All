@@ -55,7 +55,7 @@ def post_device_metadata(config_values, BASE_URL, USER_AGENT, mac_wifi,
     with open(payload_path, "w") as f:
         f.write(payload_json)
 
-    url = f"{BASE_URL}onboard/mdps_qc_enroll.php"
+    url = f"{BASE_URL}/onboard/mdps_qc_enroll.php"
 
     cmd = [
         "curl",
@@ -112,7 +112,7 @@ def fetch_and_decode_cacerts(config_values, BASE_URL, USER_AGENT):
         print("[!] Missing EST URL or OTP.")
         return False
 
-    cacerts_url = f"{BASE_URL}.well-known/est/qc:{otp}/cacerts"
+    cacerts_url = f"{BASE_URL}/.well-known/est/qc:{otp}/cacerts"
     base64_path = "/tmp/aqc/ca_root.b64"
     binary_path = "/tmp/aqc/ca_root.bin"
     log_path = "/tmp/aqc/curl_cacerts.log"
@@ -155,7 +155,7 @@ def fetch_and_parse_csrattrs(extracted_data, config_values, BASE_URL, USER_AGENT
         print("[!] Missing EST URL or OTP for CSR attributes.")
         return False
 
-    csrattr_url = f"{BASE_URL}.well-known/est/qc:{otp}/csrattrs"
+    csrattr_url = f"{BASE_URL}/.well-known/est/qc:{otp}/csrattrs"
     b64_path = "/tmp/aqc/ca_csrattr.b64"
     bin_path = "/tmp/aqc/ca_csrattr.bin"
     txt_path = "/tmp/aqc/ca_csrattr.txt"
@@ -198,7 +198,7 @@ def post_csr_request(config_values, BASE_URL, USER_AGENT, reenroll=False):
         return False
 
     endpoint = "simplereenroll" if reenroll else "simpleenroll"
-    url = f"{BASE_URL}.well-known/est/qc:{otp}/{endpoint}"
+    url = f"{BASE_URL}/.well-known/est/qc:{otp}/{endpoint}"
 
     csr_file = "/tmp/aqc/csr_mydevice_fix.csr"
     reply_file = "/tmp/aqc/csr_post_reply.b64"

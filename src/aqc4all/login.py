@@ -165,7 +165,7 @@ def perform_login_and_extract_gsid(args, USER_AGENT, BASE_URL, USERNAME, PASSWOR
             if match:
                 gsid = match.group(1)
                 print("[✓] Found GSID:", gsid)
-                download_url = f"{BASE_URL.rstrip('/')}/onboard/mdps_qc_profile.php?GSID={gsid}"
+                download_url = f"{BASE_URL}/onboard/mdps_qc_profile.php?GSID={gsid}"
                 print("[✓] Direct download URL:", download_url)
                 break
             time.sleep(2)
